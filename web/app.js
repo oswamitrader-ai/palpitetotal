@@ -104,6 +104,7 @@ async function syncFromSupabase() {
         amount: Number(t.amount),
         description: t.description,
         type: t.type,
+        status: t.status || 'COMPLETED',
         timestamp: new Date(t.timestamp).getTime()
       }));
     } else {
@@ -181,7 +182,11 @@ function seedInitialPosts() {
 
 // ---- WALLET HELPERS ----
 function getBalance() {
-  return store.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+  return store.transactions
+    .filter(tx => !(tx.type === 'DEPOSIT' && tx.status === 'PENDING'))
+    .filter(tx => !(tx.type === 'DEPOSIT' && tx.status === 'REJECTED'))
+    .filter(tx => !(tx.type === 'WITHDRAWAL' && tx.status === 'REJECTED'))
+    .reduce((sum, tx) => sum + tx.amount, 0);
 }
 
 function formatMoney(val) {
@@ -255,7 +260,9 @@ function switchTab(tab) {
 
   // Show/hide FAB
   const fab = document.getElementById('fab-btn');
-  fab.style.display = ['feed', 'manage', 'social'].includes(tab) ? 'flex' : 'none';
+  if (fab) {
+    fab.style.display = ['feed', 'manage', 'social'].includes(tab) ? 'flex' : 'none';
+  }
 
   renderCurrentTab();
 }

@@ -536,7 +536,9 @@ function switchTab(tab) {
 
   // Show/hide FAB
   const fab = document.getElementById('fab-btn');
-  fab.style.display = ['feed', 'manage', 'social'].includes(tab) ? 'flex' : 'none';
+  if (fab) {
+    fab.style.display = ['feed', 'manage', 'social'].includes(tab) ? 'flex' : 'none';
+  }
 
   renderCurrentTab();
 }
