@@ -1516,8 +1516,11 @@ function openAdminEditBetModal(betId) {
   document.getElementById('adm-edit-category').value = bet.category;
   document.getElementById('adm-edit-optA').value = bet.option_a;
   document.getElementById('adm-edit-optB').value = bet.option_b;
-  document.getElementById('adm-edit-oddsA').value = Number(bet.odds_a).toFixed(2);
-  document.getElementById('adm-edit-oddsB').value = Number(bet.odds_b).toFixed(2);
+  const probA = Math.round(100 / (parseFloat(bet.odds_a) || 1.90));
+  const probB = Math.round(100 / (parseFloat(bet.odds_b) || 1.90));
+  document.getElementById('adm-edit-probA').value = probA;
+  document.getElementById('adm-edit-probB').value = probB;
+  document.getElementById('adm-edit-liquidity').value = '0.00';
 
   openModal('modal-admin-edit-bet');
 }
@@ -1529,13 +1532,26 @@ async function confirmAdminEditBet() {
   const cat = document.getElementById('adm-edit-category').value;
   const optA = document.getElementById('adm-edit-optA').value.trim();
   const optB = document.getElementById('adm-edit-optB').value.trim();
-  const oddsA = parseFloat(document.getElementById('adm-edit-oddsA').value) || 1.90;
-  const oddsB = parseFloat(document.getElementById('adm-edit-oddsB').value) || 1.90;
+  const probA = parseFloat(document.getElementById('adm-edit-probA').value) || 50;
+  const probB = parseFloat(document.getElementById('adm-edit-probB').value) || 50;
+  const injectLiquidity = parseFloat(document.getElementById('adm-edit-liquidity').value) || 0;
 
   if (!id || !title || !desc || !optA || !optB) {
     showSnackbar('Preencha todos os campos!');
     return;
   }
+
+  const oddsA = probA > 0 ? (100 / probA) : 1.90;
+  const oddsB = probB > 0 ? (100 / probB) : 1.90;
+
+  const bet = adminStore.bets.find(b => b.id == id);
+  if (!bet) return;
+
+  let newTotalPool = parseFloat(bet.total_pool) || 0;
+  newTotalPool += injectLiquidity;
+
+  const newPoolA = newTotalPool * (probA / 100);
+  const newPoolB = newTotalPool * (probB / 100);
 
   try {
     await supabaseClient.from('bets').update({
@@ -1545,8 +1561,28 @@ async function confirmAdminEditBet() {
       option_a: optA,
       option_b: optB,
       odds_a: oddsA,
-      odds_b: oddsB
+      odds_b: oddsB,
+      pool_a: newPoolA,
+      pool_b: newPoolB,
+      total_pool: newTotalPool
     }).eq('id', id);
+
+    if (injectLiquidity > 0) {
+      await supabaseClient.from('transactions').insert({
+        amount: -injectLiquidity,
+        description: `Injeção de Liquidez Extra (Edição): ${title}`,
+        type: 'LIQUIDITY_ADD',
+        status: 'COMPLETED',
+        username: 'admin_user'
+      });
+      await supabaseClient.from('user_portfolios').insert({
+        bet_id: id,
+        user_id: 'admin_user',
+        username: 'admin_user',
+        shares_a: injectLiquidity * (probA / 100),
+        shares_b: injectLiquidity * (probB / 100)
+      });
+    }
 
     closeModal('modal-admin-edit-bet');
     showSnackbar('⚡ Odds e detalhes atualizados em tempo real no Supabase!');

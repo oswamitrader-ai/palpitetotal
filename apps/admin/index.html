@@ -521,13 +521,19 @@
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group">
-          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Odds Opção A (Live)</label>
-          <input type="number" class="form-input" id="adm-edit-oddsA" step="0.05" min="1.01">
+          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Probabilidade A (%)</label>
+          <input type="number" class="form-input" id="adm-edit-probA" step="1" min="1" max="99" oninput="document.getElementById('adm-edit-probB').value = 100 - this.value">
         </div>
         <div class="form-group">
-          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Odds Opção B (Live)</label>
-          <input type="number" class="form-input" id="adm-edit-oddsB" step="0.05" min="1.01">
+          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Probabilidade B (%)</label>
+          <input type="number" class="form-input" id="adm-edit-probB" step="1" min="1" max="99" oninput="document.getElementById('adm-edit-probA').value = 100 - this.value">
         </div>
+      </div>
+
+      <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px;">💰 Injetar Mais Liquidez (R$)</label>
+        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Opcional: Valor adicional descontado da sua conta admin para fortalecer este mercado. (0 = Apenas recalcula o pool atual)</div>
+        <input type="number" class="form-input" id="adm-edit-liquidity" value="0.00" min="0" step="10" style="color:var(--neon-emerald);font-weight:bold;">
       </div>
 
       <button class="btn-primary" onclick="confirmAdminEditBet()">💾 Salvar Alterações e Atualizar Odds</button>

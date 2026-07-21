@@ -489,44 +489,7 @@ function executePlaceBet(bet, option, amount) {
   renderCurrentTab();
 }
 
-// ---- CREATE BET ----
-function openCreateBet() {
-  document.getElementById('create-title').value = '';
-  document.getElementById('create-desc').value = '';
-  document.getElementById('create-optA').value = 'Sim';
-  document.getElementById('create-optB').value = 'Não';
-  document.getElementById('create-oddsA').value = '1.90';
-  document.getElementById('create-oddsB').value = '1.90';
-  openModal('modal-create-bet');
-}
-
-function confirmCreateBet() {
-  const title = document.getElementById('create-title').value.trim();
-  const desc = document.getElementById('create-desc').value.trim();
-  const cat = document.getElementById('create-category').value;
-  const optA = document.getElementById('create-optA').value.trim();
-  const optB = document.getElementById('create-optB').value.trim();
-  const oddsA = parseFloat(document.getElementById('create-oddsA').value) || 1.90;
-  const oddsB = parseFloat(document.getElementById('create-oddsB').value) || 1.90;
-
-  if (!title || !desc || !optA || !optB) {
-    showSnackbar('Preencha todos os campos!');
-    return;
-  }
-
-  store.bets.push({
-    id: store.nextBetId++, title, description: desc, category: cat,
-    creatorName: 'Você', optionA: optA, optionB: optB,
-    oddsA, oddsB, status: 'OPEN', isTrending: false, totalPool: 0, createdAt: Date.now()
-  });
-
-  addXp(100);
-  simulateTrendingNewBetAlert(title, cat);
-  saveStore(store);
-  closeModal('modal-create-bet');
-  showSnackbar('Aposta criada com sucesso! Já está no feed.');
-  renderCurrentTab();
-}
+// ---- APOSTAS SÃO CRIADAS APENAS PELO ADMIN ----
 
 // ---- SOCIAL TAB ----
 function renderSocial() {

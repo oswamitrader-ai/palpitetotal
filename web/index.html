@@ -123,12 +123,6 @@
 
   </main>
 
-  <!-- ========== FAB ========== -->
-  <button class="fab" id="fab-btn" onclick="openCreateBet()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14m-7-7h14"/></svg>
-    Novo Palpite
-  </button>
-
   <!-- ========== BOTTOM NAV ========== -->
   <nav class="bottom-nav">
     <button class="nav-item active" data-tab="feed" onclick="switchTab('feed')">
@@ -189,57 +183,7 @@
     </div>
   </div>
 
-  <!-- Create Bet Modal -->
-  <div class="modal-overlay" id="modal-create-bet">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-title">Criar Palpite Comunitário</span>
-        <button class="modal-close" onclick="closeModal('modal-create-bet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Título do Palpite</label>
-        <input type="text" class="form-input" id="create-title" placeholder="Ex: O time X ganhará amanhã?">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Descrição</label>
-        <textarea class="form-textarea" id="create-desc" placeholder="Detalhes e critérios do palpite..."></textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Categoria</label>
-        <select class="form-select" id="create-category">
-          <option value="Dia-a-dia">Dia-a-dia</option>
-          <option value="Tempo">Tempo</option>
-          <option value="Política">Política</option>
-          <option value="Esportes">Esportes</option>
-          <option value="Entretenimento">Entretenimento</option>
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Opção A</label>
-          <input type="text" class="form-input" id="create-optA" value="Sim">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Opção B</label>
-          <input type="text" class="form-input" id="create-optB" value="Não">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Odds A</label>
-          <input type="number" class="form-input" id="create-oddsA" value="1.90" step="0.05" min="1.00">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Odds B</label>
-          <input type="number" class="form-input" id="create-oddsB" value="1.90" step="0.05" min="1.00">
-        </div>
-      </div>
-      <button class="btn-primary" onclick="confirmCreateBet()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m-7-7h14"/></svg>
-        Publicar Palpite (+100 XP)
-      </button>
-    </div>
-  </div>
+
 
   <!-- Deposit Modal -->
   <div class="modal-overlay" id="modal-deposit">
