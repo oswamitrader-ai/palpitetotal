@@ -18,27 +18,20 @@ const STORE_KEY = 'palpitetotal_data';
 
 function getDefaultStore() {
   return {
-    bets: [
-      { id: 1, title: 'Será que chove hoje em São Paulo?', description: 'Baseado na previsão oficial do tempo de Congonhas.', category: 'Tempo', creatorName: 'Sistema', optionA: 'Sim', optionB: 'Não', oddsA: 1.80, oddsB: 2.10, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() },
-      { id: 2, title: "O próximo debate eleitoral mencionará 'Moeda Única'?", description: 'Palavra exata dita por qualquer candidato na TV aberta.', category: 'Política', creatorName: 'Sistema', optionA: 'Sim', optionB: 'Não', oddsA: 1.95, oddsB: 1.85, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() },
-      { id: 3, title: 'O Palmeiras ganhará o clássico paulista neste domingo?', description: 'Partida oficial do Campeonato Brasileiro de Futebol.', category: 'Esportes', creatorName: 'Sistema', optionA: 'Sim', optionB: 'Não', oddsA: 2.15, oddsB: 1.75, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() },
-      { id: 4, title: 'O metrô da Linha Amarela atrasará no pico amanhã?', description: 'Definido como interrupção reportada por mais de 5 minutos.', category: 'Dia-a-dia', creatorName: 'Sistema', optionA: 'Sim', optionB: 'Não', oddsA: 1.65, oddsB: 2.30, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() },
-      { id: 5, title: 'O preço do pão francês passará de R$ 22/kg na padaria central?', description: 'Acompanhamento da tabela de preços na zona sul.', category: 'Dia-a-dia', creatorName: 'Sistema', optionA: 'Sim', optionB: 'Não', oddsA: 1.90, oddsB: 1.90, status: 'OPEN', isTrending: false, totalPool: 0, createdAt: Date.now() },
-      { id: 6, title: 'Quem levará o prêmio de melhor álbum no festival nacional?', description: 'Escolha oficial do júri técnico do evento.', category: 'Entretenimento', creatorName: 'Sistema', optionA: 'Favorito', optionB: 'Indie Revelação', oddsA: 1.40, oddsB: 3.10, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() }
-    ],
+    bets: [],
     userBets: [],
     portfolios: [],
     transactions: [],
     profile: {
-      username: 'PalpiteiroMestre',
-      xp: 150,
+      username: '',
+      xp: 0,
       level: 1,
       referralCount: 0,
-      interests: 'Tempo,Esportes,Política'
+      interests: ''
     },
     posts: [],
     notifications: [],
-    nextBetId: 7,
+    nextBetId: 1,
     nextUserBetId: 1,
     nextTxId: 1,
     nextPostId: 1,
