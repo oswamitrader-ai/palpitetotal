@@ -687,11 +687,27 @@ button, a, [role="button"] {
   gap: 8px;
 }
 
+.market-bar-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(239, 68, 68, 0.5); /* Fundo vermelho para "Não" */
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.market-bar-fill {
+  height: 100%;
+  background: var(--neon-emerald); /* Preenchimento verde para "Sim" */
+  border-radius: 2px;
+  transition: width 0.5s ease-in-out;
+}
+
 .odds-btn {
   background: var(--slate-dark);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md);
-  padding: 12px 10px;
+  padding: 10px 12px;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -702,25 +718,54 @@ button, a, [role="button"] {
 }
 
 .odds-btn:active {
-  background: #172033;
   transform: scale(0.97);
+}
+
+.odds-btn.buy-yes {
+  background: var(--neon-emerald);
+  border-color: var(--neon-emerald);
+}
+
+.odds-btn.buy-yes:hover {
+  background: #0ea5e9; /* Um tom um pouco mais escuro ou o mesmo se for mobile sem hover */
+  transform: scale(0.98);
+}
+
+.odds-btn.buy-yes .odds-value,
+.odds-btn.buy-yes .odds-label {
+  color: var(--slate-dark);
+}
+
+.odds-btn.buy-no {
+  background: #EF4444;
+  border-color: #EF4444;
+}
+
+.odds-btn.buy-no:hover {
+  background: #DC2626;
+  transform: scale(0.98);
+}
+
+.odds-btn.buy-no .odds-value,
+.odds-btn.buy-no .odds-label {
+  color: #FFFFFF;
 }
 
 .odds-label {
   font-size: 0.75rem;
   color: var(--text-white);
-  font-weight: 600;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  text-align: left;
   margin-right: 6px;
 }
 
 .odds-value {
-  color: var(--neon-emerald);
   font-weight: 800;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
 }
 
@@ -1746,11 +1791,50 @@ button, a, [role="button"] {
   }
 }
 
+/* =============================================
+   TRADE TABS (MODAL COMPRAR/VENDER)
+   ============================================= */
+.trade-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+.trade-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 10px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.trade-tab:hover {
+  color: var(--text-white);
+}
+.trade-tab.active#tab-buy {
+  background: var(--neon-emerald, #10B981);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.trade-tab.active#tab-sell {
+  background: #EF4444;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
 /* Tablets em landscape / iPads (>= 768px) */
 @media (min-width: 768px) {
   .main-content { max-width: 640px; }
   .stats-row { gap: 12px; }
   .bet-odds-row { gap: 12px; }
+
+
 
   .bottom-nav {
     max-width: 600px;
@@ -2517,3 +2601,4 @@ button, a, [role="button"] {
   width: 10px; height: 10px; border-radius: 50%;
   background: #fff; animation: live-pulse 0.8s ease-in-out infinite;
 }
+

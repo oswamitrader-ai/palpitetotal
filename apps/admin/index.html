@@ -85,7 +85,7 @@
 
         <button class="admin-nav-item" id="nav-withdrawals" onclick="switchAdminTab('withdrawals')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12l10-10 10 10"/></svg>
-          <span>💸 Saques Pendentes</span>
+          <span>💸 Aprovações Financeiras</span>
         </button>
 
         <button class="admin-nav-item" id="nav-payments" onclick="switchAdminTab('payments')">
@@ -172,8 +172,8 @@
         <div class="admin-tab-page" id="admin-tab-withdrawals">
           <div class="page-title-row">
             <div>
-              <h1 class="section-title">💸 Gestão de Saques</h1>
-              <p class="section-subtitle">Saques solicitados pelos apostadores via Pix. Aprovar libera o pagamento, Rejeitar estorna o saldo ao usuário.</p>
+              <h1 class="section-title">💸 Aprovações Financeiras</h1>
+              <p class="section-subtitle">Gestão de aprovações para Depósitos e Saques dos apostadores. Aprovar libera o saldo/pagamento.</p>
             </div>
             <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="loadAdminData()">🔄 Atualizar</button>
           </div>
@@ -239,6 +239,7 @@
           <!-- Filtro Abertas / Encerradas -->
           <div class="manage-toggle" style="max-width:320px;margin-bottom:16px;">
             <button class="manage-toggle-btn active" id="adm-filter-open" onclick="setAdminBetFilter('OPEN')">Apostas Abertas (<span id="adm-open-count">0</span>)</button>
+            <button class="manage-toggle-btn" id="adm-filter-scheduled" onclick="setAdminBetFilter('SCHEDULED')">Agendadas (<span id="adm-scheduled-count">0</span>)</button>
             <button class="manage-toggle-btn" id="adm-filter-closed" onclick="setAdminBetFilter('CLOSED')">Resolvidas (<span id="adm-closed-count">0</span>)</button>
           </div>
 
@@ -400,16 +401,6 @@
             <input type="text" class="form-input" id="adm-create-optB" value="Não">
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label class="form-label">Odds Opção A</label>
-            <input type="number" class="form-input" id="adm-create-oddsA" value="1.90" step="0.05">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Odds Opção B</label>
-            <input type="number" class="form-input" id="adm-create-oddsB" value="1.90" step="0.05">
-          </div>
-        </div>
       </div>
 
       <!-- CAMPOS DE CONTAGEM -->
@@ -444,17 +435,20 @@
             <label class="form-label">Meta de Contagem (número alvo)</label>
             <input type="number" class="form-input" id="adm-create-target" placeholder="Ex: 500" min="1">
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="form-group">
-              <label class="form-label">Opção ACIMA (Odds)</label>
-              <input type="number" class="form-input" id="adm-create-oddsA" value="1.90" step="0.05">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Opção ABAIXO (Odds)</label>
-              <input type="number" class="form-input" id="adm-create-oddsB" value="1.90" step="0.05">
-            </div>
           </div>
         </div>
+      </div>
+
+      <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px;">💰 Aporte de Liquidez Real (R$)</label>
+        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Este valor será descontado da sua conta de Administrador para comprar cotas iniciais do Sim e do Não, garantindo que o mercado inicie com 50% de probabilidade.</div>
+        <input type="number" class="form-input" id="adm-create-liquidity" value="100.00" min="10" step="10" style="color:var(--neon-emerald);font-weight:bold;">
+      </div>
+
+      <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:12px;margin-bottom:16px;">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px;">📅 Agendar Publicação <span style="font-size:0.6rem;background:var(--slate-dark);padding:2px 6px;border-radius:4px;color:var(--text-gray);">Opcional</span></label>
+        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Se preenchido, a aposta será publicada automaticamente pelo sistema apenas no dia e horário escolhido.</div>
+        <input type="datetime-local" class="form-input" id="adm-create-scheduled-for">
       </div>
 
       <button class="btn-primary" onclick="confirmAdminCreateBet()">🚀 Lançar Aposta Oficial</button>

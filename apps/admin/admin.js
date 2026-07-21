@@ -396,18 +396,24 @@ function renderAdminCharts(totalVolume, totalPayouts, houseGGR) {
 function setAdminBetFilter(filter) {
   betFilter = filter;
   document.getElementById('adm-filter-open').classList.toggle('active', filter === 'OPEN');
+  document.getElementById('adm-filter-scheduled').classList.toggle('active', filter === 'SCHEDULED');
   document.getElementById('adm-filter-closed').classList.toggle('active', filter === 'CLOSED');
   renderAdminSoberanoView();
 }
 
 function renderAdminSoberanoView() {
   const openBets = adminStore.bets.filter(b => b.status === 'OPEN');
-  const closedBets = adminStore.bets.filter(b => b.status !== 'OPEN');
+  const scheduledBets = adminStore.bets.filter(b => b.status === 'SCHEDULED');
+  const closedBets = adminStore.bets.filter(b => b.status !== 'OPEN' && b.status !== 'SCHEDULED');
 
   document.getElementById('adm-open-count').textContent = openBets.length;
+  if(document.getElementById('adm-scheduled-count')) document.getElementById('adm-scheduled-count').textContent = scheduledBets.length;
   document.getElementById('adm-closed-count').textContent = closedBets.length;
 
-  const targetBets = betFilter === 'OPEN' ? openBets : closedBets;
+  let targetBets = [];
+  if (betFilter === 'OPEN') targetBets = openBets;
+  else if (betFilter === 'SCHEDULED') targetBets = scheduledBets;
+  else targetBets = closedBets;
   const list = document.getElementById('adm-bets-list');
 
   if (targetBets.length === 0) {
@@ -460,6 +466,23 @@ function renderAdminSoberanoView() {
           </div>
         </div>
       `;
+    } else if (b.status === 'SCHEDULED') {
+      const scheduledDate = b.scheduled_for ? new Date(b.scheduled_for).toLocaleString('pt-BR') : 'Sem data';
+      return `
+        <div class="bet-card" style="margin-bottom:14px; position:relative; border: 1px dashed rgba(251,191,36,0.5);">
+          <div class="bet-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="cat-badge ${catClass}">${b.category}</span>
+              <span style="font-size:0.65rem;color:var(--gold-accent);font-weight:700;">⏳ Agendado para: ${scheduledDate}</span>
+            </div>
+            <div style="display:flex;align-items:center;">
+              <button class="crm-btn-sm" style="padding:3px 10px;color:#EF4444;background:rgba(239,68,68,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;" onclick="deleteAdminBet(${b.id}, '${b.title.replace(/'/g, "\\'")}')">🗑️ Excluir</button>
+            </div>
+          </div>
+          <div class="bet-title">${b.title}</div>
+          <div class="bet-desc">${b.description}</div>
+        </div>
+      `;
     } else {
       const winnerText = b.status === 'RESOLVED_A' ? b.option_a : b.option_b;
       return `
@@ -469,7 +492,10 @@ function renderAdminSoberanoView() {
               <span class="cat-badge ${catClass}">${b.category}</span>
               <span class="pool-text" style="position:static;">Pool Final: ${formatMoney(Number(b.total_pool))}</span>
             </div>
-            <button class="crm-btn-sm" style="padding:3px 10px;color:#EF4444;background:rgba(239,68,68,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;" onclick="deleteAdminBet(${b.id}, '${b.title.replace(/'/g, "\\'")}')">🗑️ Excluir</button>
+            <div style="display:flex;align-items:center;">
+              <button class="crm-btn-sm" style="padding:3px 10px;color:var(--neon-emerald);background:rgba(16,185,129,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;margin-right:8px;" onclick="republishAdminBet(${b.id})">🔄 Republicar</button>
+              <button class="crm-btn-sm" style="padding:3px 10px;color:#EF4444;background:rgba(239,68,68,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;" onclick="deleteAdminBet(${b.id}, '${b.title.replace(/'/g, "\\'")}')">🗑️ Excluir</button>
+            </div>
           </div>
           <div class="bet-title">${b.title}</div>
           ${isCounter ? `<div style="text-align:center;font-size:1.5rem;font-weight:900;color:#A78BFA;margin:8px 0;">📊 ${Number(b.live_count||0).toLocaleString('pt-BR')} ${b.count_subject || 'contados'}</div>` : ''}
@@ -478,6 +504,75 @@ function renderAdminSoberanoView() {
       `;
     }
   }).join('');
+}
+
+async function republishAdminBet(betId) {
+  const b = adminStore.bets.find(bet => bet.id === betId);
+  if (!b) return;
+  
+  if (!confirm(`Deseja republicar o palpite "${b.title}" como uma nova aposta aberta?\nUm novo registro será criado no topo do Feed.`)) return;
+
+  const liqStr = prompt('Qual a liquidez inicial (Volume Financeiro) do evento republicado?', '100');
+  const liquidity = parseFloat(liqStr);
+  if (isNaN(liquidity) || liquidity <= 0) return;
+
+  const pA = liquidity / 2;
+  const pB = liquidity / 2;
+
+  const newBet = {
+    title: b.title,
+    description: b.description,
+    category: b.category,
+    option_a: b.option_a,
+    option_b: b.option_b,
+    odds_a: 1.90,
+    odds_b: 1.90,
+    pool_a: pA,
+    pool_b: pB,
+    status: 'OPEN',
+    total_pool: liquidity,
+    bet_type: b.bet_type,
+    count_target: b.count_target,
+    count_subject: b.count_subject,
+    count_location: b.count_location,
+    count_min: b.count_min,
+    count_max: b.count_max,
+    camera_label: b.camera_label,
+    camera_url: b.camera_url,
+    live_count: 0,
+    is_trending: b.is_trending,
+    creator_name: 'Admin',
+    scheduled_for: null
+  };
+
+  try {
+    const { data: newBetData, error } = await supabaseClient.from('bets').insert(newBet).select();
+    if (error) throw error;
+
+    if (newBetData && newBetData.length > 0) {
+      const newBetId = newBetData[0].id;
+      
+      // Admin atua como Liquidity Provider
+      await supabaseClient.from('transactions').insert({
+         amount: -liquidity,
+         description: `Provisão de Liquidez (Republicado): ${b.title}`,
+         type: 'LIQUIDITY_ADD'
+      });
+      
+      await supabaseClient.from('user_portfolios').insert({
+         bet_id: newBetId,
+         user_id: 'admin_user',
+         shares_a: pA,
+         shares_b: pB
+      });
+    }
+
+    showSnackbar('✅ Aposta republicada com sucesso!');
+    loadAdminData();
+  } catch (err) {
+    console.error('Erro ao republicar:', err);
+    showSnackbar('Erro ao republicar aposta.');
+  }
 }
 
 async function deleteAdminBet(betId, betTitle) {
@@ -517,23 +612,36 @@ async function resolveBetAdmin(betId, winningOption) {
     const toProcess = pendingUserBets || [];
     console.log(`Resolvendo ${toProcess.length} palpite(s) pendentes para aposta #${betId}`);
 
+    const winningPool = winningOption === 'A' ? Number(bet.pool_a || 100) : Number(bet.pool_b || 100);
+    const totalPool = Number(bet.total_pool || 200);
+
     for (let ub of toProcess) {
       const won = ub.chosen_option === winningOption;
       const ubStatus = won ? 'WON' : 'LOST';
 
+      let actualPayout = 0;
+      if (won) {
+        if (winningPool > 0) {
+          actualPayout = (Number(ub.amount) / winningPool) * totalPool;
+        } else {
+          // Fallback de segurança 
+          actualPayout = Number(ub.amount) * Number(ub.odds || 1.90);
+        }
+      }
+
       // 3. Atualiza status do user_bet — isso dispara o realtime no mobile
       await supabaseClient.from('user_bets')
-        .update({ status: ubStatus })
+        .update({ status: ubStatus, potential_win: actualPayout })
         .eq('id', ub.id);
 
       // 4. Cria transação de prêmio se ganhou
       if (won) {
         await supabaseClient.from('transactions').insert({
-          amount: Number(ub.potential_win),
+          amount: actualPayout,
           description: `Prêmio ganho: ${bet.title}`,
           type: 'BET_WON'
         });
-        showSnackbar(`🏆 Apostador ganhou R$ ${Number(ub.potential_win).toFixed(2)} em: ${bet.title}`);
+        showSnackbar(`🏆 Apostador ganhou R$ ${actualPayout.toFixed(2)} em: ${bet.title}`);
       }
     }
 
@@ -583,8 +691,7 @@ function openAdminCreateBetModal() {
   currentCreateBetType = 'CLASSIC';
   document.getElementById('adm-create-title').value = '';
   document.getElementById('adm-create-desc').value = '';
-  document.getElementById('adm-create-oddsA').value = '1.90';
-  document.getElementById('adm-create-oddsB').value = '1.90';
+  document.getElementById('adm-create-liquidity').value = '100.00';
   // Reset tipo
   setAdminBetType('CLASSIC');
   openModal('modal-admin-create-bet');
@@ -594,20 +701,30 @@ async function confirmAdminCreateBet() {
   const title = document.getElementById('adm-create-title').value.trim();
   const desc = document.getElementById('adm-create-desc').value.trim();
   const cat = document.getElementById('adm-create-category').value;
-  const oddsA = parseFloat(document.getElementById('adm-create-oddsA').value) || 1.90;
-  const oddsB = parseFloat(document.getElementById('adm-create-oddsB').value) || 1.90;
-
+  const liquidity = parseFloat(document.getElementById('adm-create-liquidity').value) || 100;
+  
   if (!title || !desc) {
     showSnackbar('Preencha título e descrição!');
     return;
   }
 
+  const scheduledForStr = document.getElementById('adm-create-scheduled-for')?.value;
+
+  const pA = liquidity / 2;
+  const pB = liquidity / 2;
+
   let payload = {
     title, description: desc, category: cat,
     creator_name: 'Soberano Admin',
-    odds_a: oddsA, odds_b: oddsB,
-    status: 'OPEN', is_trending: true, total_pool: 0
+    odds_a: 1.90, odds_b: 1.90,
+    pool_a: pA, pool_b: pB,
+    status: 'OPEN', is_trending: true, total_pool: liquidity
   };
+
+  if (scheduledForStr) {
+    payload.status = 'SCHEDULED';
+    payload.scheduled_for = new Date(scheduledForStr).toISOString();
+  }
 
   if (currentCreateBetType === 'CLASSIC') {
     const optA = document.getElementById('adm-create-optA').value.trim() || 'Sim';
@@ -640,9 +757,29 @@ async function confirmAdminCreateBet() {
   }
 
   try {
-    await supabaseClient.from('bets').insert(payload);
+    const { data: newBetData, error } = await supabaseClient.from('bets').insert(payload).select();
+    if (error) throw error;
+    
+    if (newBetData && newBetData.length > 0) {
+      const newBetId = newBetData[0].id;
+      
+      // Admin atua como Liquidity Provider Real
+      await supabaseClient.from('transactions').insert({
+         amount: -liquidity,
+         description: `Provisão de Liquidez: ${title}`,
+         type: 'LIQUIDITY_ADD'
+      });
+      
+      await supabaseClient.from('user_portfolios').insert({
+         bet_id: newBetId,
+         user_id: 'admin_user',
+         shares_a: pA,
+         shares_b: pB
+      });
+    }
+
     closeModal('modal-admin-create-bet');
-    showSnackbar(`✅ ${currentCreateBetType === 'COUNTER' ? '📹 Palpite de Contagem' : '🎯 Aposta clássica'} lançada!`);
+    showSnackbar(`✅ ${currentCreateBetType === 'COUNTER' ? '📹 Palpite de Contagem' : '🎯 Aposta clássica'} lançada com Liquidez Real!`);
     loadAdminData();
   } catch (err) {
     console.error('Erro ao criar aposta:', err);
@@ -1572,13 +1709,12 @@ function renderAdminWithdrawalsView() {
   const container = document.getElementById('adm-withdrawals-table');
   if (!container) return;
 
-  // Filtra apenas saques solicitados dos apostadores (transações do tipo WITHDRAWAL negativas)
-  const withdrawals = adminStore.transactions.filter(t =>
-    t.type === 'WITHDRAWAL' && Number(t.amount) < 0 && t.description && t.description.includes('Saque Pix Solicitado')
+  const pendingTx = adminStore.transactions.filter(t =>
+    t.status === 'PENDING' && (t.type === 'DEPOSIT' || t.type === 'WITHDRAWAL')
   );
 
-  if (withdrawals.length === 0) {
-    container.innerHTML = `<div class="empty-state"><h3>Nenhum saque pendente no momento 🎉</h3><p style="color:var(--text-gray);font-size:0.8rem;">Quando apostadores solicitarem saques via Pix, aparecerão aqui para aprovação.</p></div>`;
+  if (pendingTx.length === 0) {
+    container.innerHTML = `<div class="empty-state"><h3>Nenhuma aprovação pendente no momento 🎉</h3><p style="color:var(--text-gray);font-size:0.8rem;">Quando apostadores solicitarem depósitos ou saques, aparecerão aqui.</p></div>`;
     return;
   }
 
@@ -1588,22 +1724,28 @@ function renderAdminWithdrawalsView() {
         <thead>
           <tr>
             <th>ID</th>
+            <th>Tipo</th>
             <th>Descrição / Chave Pix</th>
-            <th>Valor Solicitado</th>
+            <th>Valor</th>
             <th>Data</th>
             <th>Ações</th>
           </tr>
         </thead>
         <tbody>
-          ${withdrawals.map(t => `
+          ${pendingTx.map(t => `
             <tr>
               <td>#${t.id}</td>
+              <td>
+                <span style="background:${t.type === 'DEPOSIT' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'};color:${t.type === 'DEPOSIT' ? 'var(--neon-emerald)' : 'var(--gold-accent)'};padding:4px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;">
+                  ${t.type === 'DEPOSIT' ? 'DEPÓSITO' : 'SAQUE'}
+                </span>
+              </td>
               <td style="color:var(--text-white);font-size:0.75rem;">${t.description}</td>
-              <td style="color:var(--neon-orange);font-weight:800;">${formatMoney(Math.abs(Number(t.amount)))}</td>
+              <td style="color:${t.type === 'DEPOSIT' ? 'var(--neon-emerald)' : 'var(--neon-orange)'};font-weight:800;">${formatMoney(Math.abs(Number(t.amount)))}</td>
               <td style="color:var(--text-gray);font-size:0.65rem;">${t.created_at ? new Date(t.created_at).toLocaleString('pt-BR') : '-'}</td>
               <td style="display:flex;gap:6px;">
-                <button class="crm-btn-sm" style="background:rgba(16,185,129,0.15);color:var(--neon-emerald);" onclick="approveWithdrawal(${t.id}, ${Math.abs(Number(t.amount))})">✅ Aprovar</button>
-                <button class="crm-btn-sm" style="background:rgba(239,68,68,0.15);color:#EF4444;" onclick="rejectWithdrawal(${t.id}, ${Math.abs(Number(t.amount))})">❌ Rejeitar</button>
+                <button class="crm-btn-sm" style="background:rgba(16,185,129,0.15);color:var(--neon-emerald);" onclick="approveTransaction(${t.id}, '${t.type}')">✅ Aprovar</button>
+                <button class="crm-btn-sm" style="background:rgba(239,68,68,0.15);color:#EF4444;" onclick="rejectTransaction(${t.id}, '${t.type}')">❌ Rejeitar</button>
               </td>
             </tr>
           `).join('')}
@@ -1613,45 +1755,31 @@ function renderAdminWithdrawalsView() {
   `;
 }
 
-async function approveWithdrawal(txId, amount) {
-  if (!confirm(`Confirmar APROVAÇÃO do saque de ${formatMoney(amount)}?\nO apostador receberá o valor na chave Pix informada.`)) return;
+async function approveTransaction(txId, type) {
+  const typeName = type === 'DEPOSIT' ? 'depósito' : 'saque';
+  if (!confirm(`Confirmar APROVAÇÃO do ${typeName}?\nO saldo será atualizado para o apostador.`)) return;
 
   try {
-    await supabaseClient.from('transactions').update({
-      type: 'WITHDRAWAL_APPROVED',
-      description: `Saque Aprovado e Pago — R$ ${amount.toFixed(2)}`
-    }).eq('id', txId);
-
-    showSnackbar(`✅ Saque #${txId} aprovado! Pagamento de ${formatMoney(amount)} confirmado.`);
+    await supabaseClient.from('transactions').update({ status: 'COMPLETED' }).eq('id', txId);
+    showSnackbar(`✅ ${type === 'DEPOSIT' ? 'Depósito' : 'Saque'} aprovado com sucesso!`);
     loadAdminData();
   } catch (err) {
-    console.error('Erro ao aprovar saque:', err);
-    showSnackbar('Erro ao aprovar saque no Supabase');
+    console.error('Erro ao aprovar:', err);
+    showSnackbar('Erro ao aprovar transação.');
   }
 }
 
-async function rejectWithdrawal(txId, amount) {
-  if (!confirm(`Confirmar REJEIÇÃO do saque de ${formatMoney(amount)}?\nO valor será estornado automaticamente ao saldo do apostador.`)) return;
+async function rejectTransaction(txId, type) {
+  const typeName = type === 'DEPOSIT' ? 'depósito' : 'saque';
+  if (!confirm(`Tem certeza que deseja REJEITAR este ${typeName}?`)) return;
 
   try {
-    // Estorna criando uma transação positiva de reembolso
-    await Promise.all([
-      supabaseClient.from('transactions').update({
-        type: 'WITHDRAWAL_REJECTED',
-        description: `Saque Rejeitado — R$ ${amount.toFixed(2)} estornado`
-      }).eq('id', txId),
-      supabaseClient.from('transactions').insert({
-        amount: amount,
-        description: `Estorno de Saque Rejeitado (Tx #${txId})`,
-        type: 'REFUND'
-      })
-    ]);
-
-    showSnackbar(`❌ Saque #${txId} rejeitado. R$ ${amount.toFixed(2)} estornado ao apostador.`);
+    await supabaseClient.from('transactions').update({ status: 'REJECTED' }).eq('id', txId);
+    showSnackbar(`❌ ${type === 'DEPOSIT' ? 'Depósito' : 'Saque'} rejeitado.`);
     loadAdminData();
   } catch (err) {
-    console.error('Erro ao rejeitar saque:', err);
-    showSnackbar('Erro ao rejeitar saque no Supabase');
+    console.error('Erro ao rejeitar:', err);
+    showSnackbar('Erro ao rejeitar transação.');
   }
 }
 

@@ -27,6 +27,7 @@ function getDefaultStore() {
       { id: 6, title: 'Quem levará o prêmio de melhor álbum no festival nacional?', description: 'Escolha oficial do júri técnico do evento.', category: 'Entretenimento', creatorName: 'Sistema', optionA: 'Favorito', optionB: 'Indie Revelação', oddsA: 1.40, oddsB: 3.10, status: 'OPEN', isTrending: true, totalPool: 0, createdAt: Date.now() }
     ],
     userBets: [],
+    portfolios: [],
     transactions: [],
     profile: {
       username: 'PalpiteiroMestre',
@@ -89,20 +90,26 @@ async function syncFromSupabase() {
 
     const { data: dbBets } = await supabaseClient.from('bets').select('*').order('id', { ascending: true });
     if (dbBets && dbBets.length > 0) {
-      store.bets = dbBets.map(b => ({
-        id: Number(b.id),
-        title: b.title,
-        description: b.description,
-        category: b.category,
-        creatorName: b.creator_name,
-        optionA: b.option_a,
-        optionB: b.option_b,
-        oddsA: Number(b.odds_a),
-        oddsB: Number(b.odds_b),
-        status: b.status,
-        isTrending: b.is_trending,
-        totalPool: Number(b.total_pool),
-        createdAt: new Date(b.created_at).getTime(),
+      store.bets = dbBets.map(b => {
+        const poolA = Number(b.pool_a) || 100;
+        const poolB = Number(b.pool_b) || 100;
+        const totalP = poolA + poolB;
+        return {
+          id: Number(b.id),
+          title: b.title,
+          description: b.description,
+          category: b.category,
+          creatorName: b.creator_name,
+          optionA: b.option_a,
+          optionB: b.option_b,
+          oddsA: totalP / poolA,
+          oddsB: totalP / poolB,
+          poolA: poolA,
+          poolB: poolB,
+          status: b.status,
+          isTrending: b.is_trending,
+          totalPool: Number(b.total_pool) > 0 ? Number(b.total_pool) : totalP,
+          createdAt: new Date(b.created_at).getTime(),
         // Campos de Palpite de Contagem
         betType: b.bet_type || 'CLASSIC',
         countTarget: Number(b.count_target || 0),
@@ -113,8 +120,9 @@ async function syncFromSupabase() {
         countMax: Number(b.count_max || 0),
         cameraLabel: b.camera_label || '',
         cameraUrl: b.camera_url || ''
-      }));
-    }
+      };
+    });
+  }
 
     const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').order('id', { ascending: true });
     if (dbUserBets && dbUserBets.length > 0) {
@@ -132,6 +140,18 @@ async function syncFromSupabase() {
       }));
     }
 
+    const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').order('id', { ascending: true });
+    if (dbPortfolios && dbPortfolios.length > 0) {
+      store.portfolios = dbPortfolios.map(p => ({
+        id: Number(p.id),
+        betId: Number(p.bet_id),
+        sharesA: Number(p.shares_a),
+        sharesB: Number(p.shares_b)
+      }));
+    } else {
+      store.portfolios = [];
+    }
+
     const { data: dbTx } = await supabaseClient.from('transactions').select('*').order('id', { ascending: true });
     if (dbTx && dbTx.length > 0) {
       store.transactions = dbTx.map(t => ({
@@ -139,6 +159,7 @@ async function syncFromSupabase() {
         amount: Number(t.amount),
         description: t.description,
         type: t.type,
+        status: t.status || 'COMPLETED',
         timestamp: new Date(t.timestamp).getTime()
       }));
     }
@@ -199,15 +220,25 @@ function initRealtimeSubscriptions() {
       let isOnlyCounterUpdate = false;
 
       if (payload.eventType === 'INSERT') {
+        const poolA = Number(row.pool_a) || 100;
+        const poolB = Number(row.pool_b) || 100;
+        const totalP = poolA + poolB;
         const exists = store.bets.find(b => Number(b.id) === Number(row.id));
         if (!exists) {
           store.bets.push({
             id: Number(row.id), title: row.title, description: row.description,
             category: row.category, creatorName: row.creator_name,
             optionA: row.option_a, optionB: row.option_b,
-            oddsA: Number(row.odds_a), oddsB: Number(row.odds_b),
+            oddsA: totalP / poolA, oddsB: totalP / poolB,
+            poolA: poolA, poolB: poolB,
             status: row.status, isTrending: row.is_trending,
-            totalPool: Number(row.total_pool || 0), createdAt: new Date(row.created_at).getTime()
+            totalPool: Number(row.total_pool) > 0 ? Number(row.total_pool) : totalP,
+            createdAt: new Date(row.created_at).getTime(),
+            betType: row.bet_type || 'CLASSIC', countTarget: Number(row.count_target || 0),
+            countSubject: row.count_subject || 'pessoas', countLocation: row.count_location || '',
+            liveCount: Number(row.live_count || 0), countMin: Number(row.count_min || 0),
+            countMax: Number(row.count_max || 0), cameraLabel: row.camera_label || '',
+            cameraUrl: row.camera_url || ''
           });
           showSnackbar('🆕 Novo palpite disponível no Feed!');
         }
@@ -221,13 +252,18 @@ function initRealtimeSubscriptions() {
           const isCamUrlChanged = (prevBet.cameraUrl || '') !== (row.camera_url || '');
           const isStatusChanged = prevBet.status !== row.status;
 
+          const poolA = Number(row.pool_a) || 100;
+          const poolB = Number(row.pool_b) || 100;
+          const totalP = poolA + poolB;
+
           store.bets[idx] = {
             ...store.bets[idx],
             title: row.title, description: row.description, category: row.category,
             optionA: row.option_a, optionB: row.option_b,
-            oddsA: Number(row.odds_a), oddsB: Number(row.odds_b),
+            oddsA: totalP / poolA, oddsB: totalP / poolB,
+            poolA: poolA, poolB: poolB,
             status: row.status, isTrending: row.is_trending,
-            totalPool: Number(row.total_pool || 0),
+            totalPool: Number(row.total_pool) > 0 ? Number(row.total_pool) : totalP,
             betType: row.bet_type || 'CLASSIC',
             countTarget: Number(row.count_target || 0),
             countSubject: row.count_subject || 'pessoas',
@@ -412,7 +448,11 @@ function seedInitialPosts() {
 
 // ---- WALLET HELPERS ----
 function getBalance() {
-  return store.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+  return store.transactions
+    .filter(tx => !(tx.type === 'DEPOSIT' && tx.status === 'PENDING'))
+    .filter(tx => !(tx.type === 'DEPOSIT' && tx.status === 'REJECTED'))
+    .filter(tx => !(tx.type === 'WITHDRAWAL' && tx.status === 'REJECTED'))
+    .reduce((sum, tx) => sum + tx.amount, 0);
 }
 
 function formatMoney(val) {
@@ -649,6 +689,13 @@ function renderBetCard(bet, isTrending) {
   if (bet.betType === 'COUNTER') return renderCounterBetCard(bet);
 
   const catClass = getCatClass(bet.category);
+  
+  // Calcula probabilidades implícitas estilo Polymarket
+  const invA = 1 / bet.oddsA;
+  const invB = 1 / bet.oddsB;
+  const probA = Math.round((invA / (invA + invB)) * 100);
+  const probB = 100 - probA;
+
   return `
     <div class="bet-card${isTrending ? ' trending' : ''}">
       <div class="bet-header">
@@ -656,21 +703,28 @@ function renderBetCard(bet, isTrending) {
           <span class="cat-badge ${catClass}">${bet.category}</span>
           ${bet.isTrending ? '<svg class="trending-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z"/></svg>' : ''}
         </div>
-        <span class="pool-text">Pool: R$ ${Math.round(bet.totalPool).toLocaleString('pt-BR')}</span>
       </div>
       <div class="bet-title">${bet.title}</div>
       <div class="bet-desc">${bet.description}</div>
-      <div class="bet-odds-row">
-        <button class="odds-btn" onclick="handleBetClick(${bet.id},'A')">
+      
+      <div class="market-bar-container">
+        <div class="market-bar-fill" style="width: ${probA}%;"></div>
+      </div>
+      
+      <div class="bet-odds-row" style="margin-top:12px;">
+        <button class="odds-btn buy-yes" onclick="handleBetClick(${bet.id},'A')">
           <span class="odds-label">${bet.optionA}</span>
-          <span class="odds-value">${bet.oddsA.toFixed(2)}</span>
+          <span class="odds-value">${probA}%</span>
         </button>
-        <button class="odds-btn" onclick="handleBetClick(${bet.id},'B')">
+        <button class="odds-btn buy-no" onclick="handleBetClick(${bet.id},'B')">
           <span class="odds-label">${bet.optionB}</span>
-          <span class="odds-value">${bet.oddsB.toFixed(2)}</span>
+          <span class="odds-value">${probB}%</span>
         </button>
       </div>
-      <div class="bet-footer"><span class="creator-text">Criado por: ${bet.creatorName}</span></div>
+      
+      <div class="bet-footer" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;">
+        <span class="pool-text" style="color:var(--text-gray);font-size:0.75rem;">💰 Volume: R$ ${Math.round(bet.totalPool).toLocaleString('pt-BR')}</span>
+      </div>
     </div>
   `;
 }
@@ -802,12 +856,12 @@ function renderCounterBetCard(bet) {
           <div class="counter-option-btn" onclick="handleBetClick(${bet.id},'A')">
             <div class="counter-option-label">ACIMA de</div>
             <div class="counter-option-value">${(bet.countMax || bet.countTarget).toLocaleString('pt-BR')}</div>
-            <div class="counter-option-odds">@${bet.oddsA.toFixed(2)}</div>
+            <div class="counter-option-odds">${bet.oddsA.toFixed(2)}</div>
           </div>
           <div class="counter-option-btn" onclick="handleBetClick(${bet.id},'B')">
             <div class="counter-option-label">ABAIXO de</div>
             <div class="counter-option-value">${(bet.countMin || bet.countTarget).toLocaleString('pt-BR')}</div>
-            <div class="counter-option-odds">@${bet.oddsB.toFixed(2)}</div>
+            <div class="counter-option-odds">${bet.oddsB.toFixed(2)}</div>
           </div>
         </div>
         ` : `
@@ -954,17 +1008,38 @@ function handleBetClick(betId, option) {
   }
 }
 
+let tradeMode = 'BUY';
+function setTradeMode(mode) {
+  tradeMode = mode;
+  document.getElementById('tab-buy').className = mode === 'BUY' ? 'trade-tab active' : 'trade-tab';
+  document.getElementById('tab-sell').className = mode === 'SELL' ? 'trade-tab active' : 'trade-tab';
+  
+  // Limpa possíveis estilos residuais
+  document.getElementById('tab-buy').style.background = '';
+  document.getElementById('tab-sell').style.background = '';
+  
+  updatePayout();
+}
+
 function openPlaceBet(bet, option) {
   placeBetTarget = { bet, option };
   const optText = option === 'A' ? bet.optionA : bet.optionB;
   const odds = option === 'A' ? bet.oddsA : bet.oddsB;
+  
+  const prob = option === 'A' ? (bet.poolA / bet.totalPool) * 100 : (bet.poolB / bet.totalPool) * 100;
+  const currentPrice = prob / 100;
+
   document.getElementById('place-bet-title').textContent = bet.title;
-  document.getElementById('place-bet-option').textContent = 'Escolha: ' + optText;
-  document.getElementById('place-bet-odds').textContent = '@' + odds.toFixed(2);
+  document.getElementById('place-bet-option').textContent = optText;
+  document.getElementById('place-bet-odds').textContent = `${Math.round(prob)}% (Preço Atual: ${currentPrice.toFixed(2)}¢)`;
   document.getElementById('place-bet-balance').textContent = formatMoney(getBalance());
   document.getElementById('place-bet-amount').value = '';
-  document.getElementById('place-bet-payout').textContent = 'R$ 0,00';
+  document.getElementById('place-bet-payout').textContent = '0 Cotas';
   document.getElementById('place-bet-error').style.display = 'none';
+  setTradeMode('BUY');
+  
+
+  
   openModal('modal-place-bet');
 }
 
@@ -980,13 +1055,26 @@ function setPlaceBetAmountAllIn() {
 
 function updatePayout() {
   if (!placeBetTarget) return;
-  const odds = placeBetTarget.option === 'A' ? placeBetTarget.bet.oddsA : placeBetTarget.bet.oddsB;
+  const bet = placeBetTarget.bet;
   const amount = parseFloat(document.getElementById('place-bet-amount').value) || 0;
-  document.getElementById('place-bet-payout').textContent = formatMoney(amount * odds);
+  
+  const isA = placeBetTarget.option === 'A';
+  const newPool = (isA ? bet.poolA : bet.poolB) + amount;
+  const newTotal = bet.totalPool + amount;
+  const prob = (isA ? bet.poolA : bet.poolB) / bet.totalPool;
+  
+  if (tradeMode === 'BUY') {
+    const shares = Math.floor(amount / prob);
+    // Cada cota vencedora paga exatamente R$ 1,00. Logo, o número de cotas = Prêmio em Reais!
+    document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(shares)}`;
+  } else {
+    const cash = amount * prob;
+    document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(cash)}`;
+  }
 
   const err = document.getElementById('place-bet-error');
-  if (amount > getBalance()) {
-    err.textContent = 'Saldo insuficiente para apostar esse valor!';
+  if (tradeMode === 'BUY' && amount > getBalance()) {
+    err.textContent = 'Saldo insuficiente para essa compra!';
     err.style.display = 'block';
   } else {
     err.style.display = 'none';
@@ -996,73 +1084,95 @@ function updatePayout() {
 function confirmPlaceBet() {
   if (!placeBetTarget) return;
   const amount = parseFloat(document.getElementById('place-bet-amount').value) || 0;
-  const bal = getBalance();
-  if (amount <= 0 || amount > bal) {
-    showSnackbar('Valor inválido ou saldo insuficiente!');
-    return;
+  if (amount <= 0) return;
+  
+  const isA = placeBetTarget.option === 'A';
+  const prob = (isA ? placeBetTarget.bet.poolA : placeBetTarget.bet.poolB) / placeBetTarget.bet.totalPool;
+  
+  let shares = 0;
+  if (tradeMode === 'BUY') {
+    shares = Math.floor(amount / prob);
+  } else {
+    shares = amount; // user types shares to sell
   }
-  executePlaceBet(placeBetTarget.bet, placeBetTarget.option, amount);
+  
+  executePlaceBet(placeBetTarget.bet, placeBetTarget.option, amount, prob, shares);
   closeModal('modal-place-bet');
-  showSnackbar(`Palpite de R$ ${amount.toFixed(2)} confirmado!`);
 }
 
-async function executePlaceBet(bet, option, amount) {
-  const optText = option === 'A' ? bet.optionA : bet.optionB;
-  const odds = option === 'A' ? bet.oddsA : bet.oddsB;
-  const potentialWin = amount * odds;
+async function executePlaceBet(bet, option, amount, price, shares) {
+  const isA = option === 'A';
+  const optText = isA ? bet.optionA : bet.optionB;
+  
+  if (tradeMode === 'BUY') {
+    showSnackbar(`Ordem de Compra enviada! ${shares} Cotas ao Livro.`);
+  } else {
+    showSnackbar(`Ordem de Venda enviada! Tentando liquidar ${shares} Cotas...`);
+  }
 
-  let assignedTxId = store.nextTxId++;
-  let assignedUserBetId = store.nextUserBetId++;
-
-  const txObj = {
-    amount: -amount,
-    description: 'Aposta em: ' + bet.title + ' (' + optText + ')',
-    type: 'BET_PLACED'
-  };
-
-  const userBetObj = {
-    bet_id: bet.id,
-    bet_title: bet.title,
-    chosen_option: option,
-    chosen_option_text: optText,
-    amount: amount,
-    odds: odds,
-    potential_win: potentialWin,
-    status: 'PENDING'
-  };
+  if (tradeMode === 'BUY') {
+    if (isA) bet.poolA += amount;
+    else bet.poolB += amount;
+    bet.totalPool += amount;
+  }
 
   if (supabaseClient) {
     try {
-      const [txRes, ubRes] = await Promise.all([
-        supabaseClient.from('transactions').insert(txObj).select(),
-        supabaseClient.from('user_bets').insert(userBetObj).select(),
-        supabaseClient.from('bets').update({ total_pool: (bet.totalPool || 0) + amount }).eq('id', bet.id)
-      ]);
-      if (txRes.data && txRes.data[0]) assignedTxId = Number(txRes.data[0].id);
-      if (ubRes.data && ubRes.data[0]) assignedUserBetId = Number(ubRes.data[0].id);
-    } catch (e) {
-      console.warn('Erro ao registrar aposta no Supabase:', e);
+      // 1. Call RPC for limit order execution
+      const { data: orderId, error } = await supabaseClient.rpc('place_limit_order', {
+        p_bet_id: bet.id,
+        p_user_id: 'default_user',
+        p_option: option,
+        p_order_type: tradeMode,
+        p_price: price,
+        p_shares: shares
+      });
+      
+      if (error) throw error;
+      
+      if (tradeMode === 'BUY') {
+        // Registra transação
+        await supabaseClient.from('transactions').insert({
+          amount: -amount,
+          description: `Compra de ${shares} Cotas: ${bet.title}`,
+          type: 'BET_PLACED'
+        });
+
+        // Atualiza a barra de volume e as odds do evento para os próximos compradores! (AMM Shift)
+        supabaseClient.from('bets').update({
+          pool_a: bet.poolA,
+          pool_b: bet.poolB,
+          total_pool: bet.totalPool
+        }).eq('id', bet.id).then();
+      }
+      
+    } catch (err) {
+      console.error(err);
+      showSnackbar('Erro ao enviar ordem pro Livro de Ofertas!');
     }
   }
 
+  const newOdds = 1 / price;
+  const potentialWin = tradeMode === 'BUY' ? shares : (amount * price);
+
   // Debit local
   store.transactions.push({
-    id: assignedTxId,
+    id: store.nextTxId++,
     amount: -amount,
     description: 'Aposta em: ' + bet.title + ' (' + optText + ')',
     type: 'BET_PLACED',
     timestamp: Date.now()
   });
 
-  // User bet local
+  // User bet local (Fallback/Cache)
   store.userBets.push({
-    id: assignedUserBetId,
+    id: store.nextUserBetId++,
     betId: bet.id,
     betTitle: bet.title,
     chosenOption: option,
     chosenOptionText: optText,
     amount,
-    odds,
+    odds: newOdds,
     potentialWin,
     status: 'PENDING',
     createdAt: Date.now()
@@ -1194,7 +1304,7 @@ function renderSocial() {
           <div class="post-slip-title">${post.betTitle}</div>
           <div class="post-slip-row">
             <span class="post-slip-choice">Palpite: <strong>${post.chosenOptionText || 'Sim'}</strong></span>
-            <span class="post-slip-odds">@${Number(post.odds || 1.90).toFixed(2)}</span>
+            <span class="post-slip-odds">${Number(post.odds || 1.90).toFixed(2)}</span>
           </div>
         </div>` : ''}
         <div class="post-actions">
@@ -1317,27 +1427,32 @@ function renderMyBets() {
     return;
   }
 
-  list.innerHTML = store.userBets.map(ub => {
+  const pendingBets = store.userBets.filter(ub => ub.status === 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
+  const closedBets = store.userBets.filter(ub => ub.status !== 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
+
+  let html = '';
+
+  const renderCard = (ub) => {
     const statusClass = ub.status === 'PENDING' ? 'pending' : (ub.status === 'WON' ? 'won' : 'lost');
-    const statusText = ub.status === 'PENDING' ? 'Pendente' : (ub.status === 'WON' ? 'Ganhou' : 'Perdeu');
+    const statusText = ub.status === 'PENDING' ? 'Em Aberto' : (ub.status === 'WON' ? 'Ganhou' : 'Perdeu');
     return `
-      <div class="user-bet-card">
+      <div class="user-bet-card" style="${ub.status === 'PENDING' ? 'border: 1px solid var(--primary-color);' : ''}">
         <div class="user-bet-header">
           <span class="user-bet-title">${ub.betTitle}</span>
           <span class="status-badge ${statusClass}">${statusText}</span>
         </div>
         <div class="user-bet-details">
           <div class="detail-col">
-            <div class="detail-label">Escolha</div>
-            <div class="detail-value">${ub.chosenOptionText} @${ub.odds.toFixed(2)}</div>
+            <div class="detail-label">Opção Escolhida</div>
+            <div class="detail-value">${ub.chosenOptionText} ${ub.odds ? ub.odds.toFixed(2) : ''}</div>
           </div>
           <div class="detail-col">
             <div class="detail-label">Apostado</div>
             <div class="detail-value">${formatMoney(ub.amount)}</div>
           </div>
           <div class="detail-col">
-            <div class="detail-label">Retorno</div>
-            <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : 'var(--text-white)'}">${formatMoney(ub.potentialWin)}</div>
+            <div class="detail-label">Retorno Est.</div>
+            <div class="detail-value" style="color:${ub.status === 'WON' || ub.status === 'PENDING' ? 'var(--neon-emerald)' : 'var(--text-white)'}">${formatMoney(ub.potentialWin)}</div>
           </div>
         </div>
         <div class="user-bet-footer">
@@ -1349,7 +1464,19 @@ function renderMyBets() {
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  if (pendingBets.length > 0) {
+    html += `<h3 style="color:var(--text-white); margin-bottom:12px; display:flex; align-items:center; gap:8px;"><div class="camera-status-dot live" style="display:block;"></div> Em Aberto</h3>`;
+    html += pendingBets.map(renderCard).join('');
+  }
+
+  if (closedBets.length > 0) {
+    html += `<h3 style="color:var(--text-gray); margin-top:24px; margin-bottom:12px;">Histórico de Resultados</h3>`;
+    html += closedBets.map(renderCard).join('');
+  }
+
+  list.innerHTML = html;
 }
 
 // ---- SHARE ----
@@ -1412,12 +1539,14 @@ function renderWallet() {
 
     const sign = tx.amount >= 0 ? '+' : '';
     const amtClass = tx.amount >= 0 ? 'positive' : 'negative';
+    const pendingTag = tx.status === 'PENDING' ? '<span style="color:var(--gold-accent);font-size:0.65rem;font-weight:bold;margin-left:6px;background:rgba(245,158,11,0.2);padding:2px 6px;border-radius:4px;">PENDENTE</span>' : '';
+    
     return `
       <div class="tx-card">
         <div class="tx-left">
           <div class="tx-icon ${iconClass}">${iconSvg}</div>
           <div>
-            <div class="tx-desc">${tx.description}</div>
+            <div class="tx-desc" style="display:flex;align-items:center;">${tx.description}${pendingTag}</div>
             <div class="tx-date">${formatDate(tx.timestamp)}</div>
           </div>
         </div>
@@ -1489,7 +1618,8 @@ async function confirmDepositPayment() {
       const { data } = await supabaseClient.from('transactions').insert({
         amount: amount,
         description: `Depósito Pix Confirmado (R$ ${amount.toFixed(2)})`,
-        type: 'DEPOSIT'
+        type: 'DEPOSIT',
+        status: 'PENDING'
       }).select();
       if (data && data[0]) assignedTxId = Number(data[0].id);
     } catch (e) {
@@ -1502,6 +1632,7 @@ async function confirmDepositPayment() {
     amount: amount,
     description: `Depósito Pix Confirmado (R$ ${amount.toFixed(2)})`,
     type: 'DEPOSIT',
+    status: 'PENDING',
     timestamp: Date.now()
   });
 
@@ -1549,7 +1680,8 @@ async function confirmWithdraw() {
       const { data } = await supabaseClient.from('transactions').insert({
         amount: -amount,
         description: desc,
-        type: 'WITHDRAWAL'
+        type: 'WITHDRAWAL',
+        status: 'PENDING'
       }).select();
       if (data && data[0]) assignedTxId = Number(data[0].id);
     } catch (e) {
@@ -1562,6 +1694,7 @@ async function confirmWithdraw() {
     amount: -amount,
     description: desc,
     type: 'WITHDRAWAL',
+    status: 'PENDING',
     timestamp: Date.now()
   });
 
@@ -1682,13 +1815,22 @@ function openNotifications() {
 function renderNotifications() {
   const list = document.getElementById('notif-list');
   if (store.notifications.length === 0) {
-    list.innerHTML = '<p style="text-align:center;color:var(--text-gray);padding:20px;font-size:0.85rem;">Sem notificações</p>';
+    list.innerHTML = `
+      <div class="empty-state" style="padding:40px 20px;text-align:center;">
+        <div style="font-size:2.5rem;margin-bottom:12px;opacity:0.5;">🔕</div>
+        <h3>Tudo tranquilo por aqui</h3>
+        <p style="color:var(--text-gray);font-size:0.8rem;">Você não tem nenhuma notificação nova no momento.</p>
+      </div>
+    `;
     return;
   }
   list.innerHTML = store.notifications.map(n => `
-    <div class="notif-item${n.isRead ? '' : ' unread'}">
-      <div class="notif-title">${n.title}</div>
-      <div class="notif-message">${n.message}</div>
+    <div class="notif-item${n.isRead ? '' : ' unread'}" style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:1.5rem;background:rgba(16,185,129,0.1);padding:10px;border-radius:12px;">🔔</div>
+      <div>
+        <div class="notif-title" style="font-weight:700;font-size:0.9rem;margin-bottom:4px;color:var(--text-white);">${n.title}</div>
+        <div class="notif-message" style="color:var(--text-gray);font-size:0.8rem;line-height:1.4;">${n.message}</div>
+      </div>
     </div>
   `).join('');
 }
