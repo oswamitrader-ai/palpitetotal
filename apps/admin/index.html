@@ -450,6 +450,18 @@
         <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Se preenchido, a aposta será publicada automaticamente pelo sistema apenas no dia e horário escolhido.</div>
         <input type="datetime-local" class="form-input" id="adm-create-scheduled-for">
       </div>
+      <div class="form-group" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px;">⏰ Expiração Automática <span style="font-size:0.6rem;background:var(--slate-dark);padding:2px 6px;border-radius:4px;color:var(--text-gray);">Recomendado</span></label>
+        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Quando o prazo vencer, a aposta será encerrada automaticamente. Se nenhum dos lados atingiu a condição, o Admin poderá resolver manualmente após o encerramento.</div>
+        <input type="datetime-local" class="form-input" id="adm-create-expires-at">
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(1)">+1 hora</button>
+          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(3)">+3 horas</button>
+          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(6)">+6 horas</button>
+          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(12)">+12 horas</button>
+          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(24)">+24 horas</button>
+        </div>
+      </div>
 
       <button class="btn-primary" onclick="confirmAdminCreateBet()">🚀 Lançar Aposta Oficial</button>
     </div>

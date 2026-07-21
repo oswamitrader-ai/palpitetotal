@@ -27,6 +27,7 @@ let currentAdminTab = 'dash';
 let betFilter = 'OPEN';
 let pieChartInstance = null;
 let barChartInstance = null;
+let expirationTimerId = null;
 
 // ---- AUTH & LOGIN ----
 function handleAdminLogin() {
@@ -108,6 +109,7 @@ async function loadAdminData() {
     if (settingsRes.data) platformSettings = settingsRes.data;
 
     renderAdminCurrentTab();
+    startExpirationChecker();
   } catch (err) {
     console.error('Erro crítico no CRM Admin:', err);
     showSnackbar(`Erro crítico na sincronização: ${err.message}`);
@@ -444,6 +446,28 @@ function renderAdminSoberanoView() {
         </div>
       ` : '';
 
+      // Countdown de expiração
+      let expiresHtml = '';
+      if (b.expires_at) {
+        const now = new Date();
+        const exp = new Date(b.expires_at);
+        const diff = exp - now;
+        if (diff > 0) {
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          const urgentColor = diff < 3600000 ? '#EF4444' : 'var(--gold-accent)';
+          expiresHtml = `<div style="display:flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:6px 12px;margin-top:8px;">
+            <span style="font-size:0.7rem;color:var(--text-gray);">⏰ Expira em:</span>
+            <span style="font-size:0.85rem;font-weight:800;color:${urgentColor};font-variant-numeric:tabular-nums;">${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>
+          </div>`;
+        } else {
+          expiresHtml = `<div style="display:flex;align-items:center;gap:6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 12px;margin-top:8px;">
+            <span style="font-size:0.75rem;font-weight:800;color:#EF4444;">🚨 EXPIRADA — Aguardando encerramento automático...</span>
+          </div>`;
+        }
+      }
+
       return `
         <div class="bet-card" style="margin-bottom:14px;">
           <div class="bet-header">
@@ -457,6 +481,7 @@ function renderAdminSoberanoView() {
           <div class="bet-title">${b.title}</div>
           <div class="bet-desc">${b.description}</div>
           ${counterSection}
+          ${expiresHtml}
           <div style="font-size:0.75rem;color:var(--gold-accent);font-weight:600;margin:10px 0 6px;">
             ${isCounter ? 'Liquidar contador — Escolha a opção vencedora:' : 'Escolha a opção vencedora para liquidar:'}
           </div>
@@ -481,6 +506,24 @@ function renderAdminSoberanoView() {
           </div>
           <div class="bet-title">${b.title}</div>
           <div class="bet-desc">${b.description}</div>
+        </div>
+      `;
+    } else if (b.status === 'EXPIRED') {
+      return `
+        <div class="bet-card" style="margin-bottom:14px; position:relative; border: 1px solid rgba(239,68,68,0.3);">
+          <div class="bet-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="cat-badge ${catClass}">${b.category}</span>
+              <span style="font-size:0.65rem;font-weight:800;color:#EF4444;background:rgba(239,68,68,0.15);padding:2px 8px;border-radius:20px;">⏰ EXPIRADA</span>
+              <span class="pool-text" style="position:static;">Pool Final: ${formatMoney(Number(b.total_pool))}</span>
+            </div>
+            <div style="display:flex;align-items:center;">
+              <button class="crm-btn-sm" style="padding:3px 10px;color:var(--neon-emerald);background:rgba(16,185,129,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;margin-right:8px;" onclick="republishAdminBet(${b.id})">🔄 Republicar</button>
+              <button class="crm-btn-sm" style="padding:3px 10px;color:#EF4444;background:rgba(239,68,68,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;" onclick="deleteAdminBet(${b.id}, '${b.title.replace(/'/g, "\\'")}')">🗑️ Excluir</button>
+            </div>
+          </div>
+          <div class="bet-title">${b.title}</div>
+          <div class="resolved-result" style="background:rgba(239,68,68,0.1);color:#EF4444;">APOSTA EXPIRADA — Apostadores reembolsados automaticamente</div>
         </div>
       `;
     } else {
@@ -658,6 +701,80 @@ async function resolveBetAdmin(betId, winningOption) {
   }
 }
 
+// =============================================
+// MOTOR DE EXPIRAÇÃO AUTOMÁTICA
+// Verifica a cada 30s se alguma aposta OPEN já venceu
+// =============================================
+function startExpirationChecker() {
+  if (expirationTimerId) clearInterval(expirationTimerId);
+  
+  // Roda imediatamente na primeira vez
+  checkExpiredBets();
+  
+  // Depois roda a cada 30 segundos
+  expirationTimerId = setInterval(checkExpiredBets, 30000);
+  console.log('⏰ Motor de expiração automática ativado (30s interval)');
+}
+
+async function checkExpiredBets() {
+  const now = new Date();
+  const expiredBets = adminStore.bets.filter(b => 
+    b.status === 'OPEN' && 
+    b.expires_at && 
+    new Date(b.expires_at) <= now
+  );
+
+  for (const bet of expiredBets) {
+    console.log(`⏰ Auto-expirando aposta #${bet.id}: "${bet.title}"`);
+    await autoExpireBet(bet);
+  }
+
+  // Atualiza countdown visual se estiver na aba soberano
+  if (currentAdminTab === 'soberano' && betFilter === 'OPEN') {
+    renderAdminCurrentTab();
+  }
+}
+
+async function autoExpireBet(bet) {
+  try {
+    // 1. Fecha a aposta
+    await supabaseClient.from('bets').update({ status: 'EXPIRED' }).eq('id', bet.id);
+
+    // 2. Busca todos os palpites PENDING desta aposta
+    const { data: pendingUserBets } = await supabaseClient
+      .from('user_bets')
+      .select('*')
+      .eq('bet_id', bet.id)
+      .eq('status', 'PENDING');
+
+    const toRefund = pendingUserBets || [];
+    
+    // 3. Reembolsa todos os apostadores (aposta expirou sem resolução)
+    for (const ub of toRefund) {
+      await supabaseClient.from('user_bets')
+        .update({ status: 'REFUNDED', potential_win: Number(ub.amount) })
+        .eq('id', ub.id);
+
+      await supabaseClient.from('transactions').insert({
+        amount: Number(ub.amount),
+        description: `Reembolso: "${bet.title}" expirou sem resultado`,
+        type: 'REFUND'
+      });
+    }
+
+    showSnackbar(`⏰ Aposta "${bet.title}" expirou! ${toRefund.length} apostador(es) reembolsados.`);
+    
+    // Atualiza store local
+    const idx = adminStore.bets.findIndex(b => Number(b.id) === Number(bet.id));
+    if (idx >= 0) adminStore.bets[idx].status = 'EXPIRED';
+    
+    renderAdminCurrentTab();
+  } catch (err) {
+    console.error(`Erro ao auto-expirar aposta #${bet.id}:`, err);
+    showSnackbar(`Erro ao expirar aposta: ${err.message}`);
+  }
+}
+
 // Tipo atual de aposta sendo criada
 let currentCreateBetType = 'CLASSIC';
 
@@ -687,11 +804,19 @@ function setAdminBetType(type) {
   }
 }
 
+function setExpiresQuick(hours) {
+  const dt = new Date(Date.now() + hours * 3600000);
+  const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  document.getElementById('adm-create-expires-at').value = local;
+}
+
 function openAdminCreateBetModal() {
   currentCreateBetType = 'CLASSIC';
   document.getElementById('adm-create-title').value = '';
   document.getElementById('adm-create-desc').value = '';
   document.getElementById('adm-create-liquidity').value = '100.00';
+  if (document.getElementById('adm-create-expires-at')) document.getElementById('adm-create-expires-at').value = '';
+  if (document.getElementById('adm-create-scheduled-for')) document.getElementById('adm-create-scheduled-for').value = '';
   // Reset tipo
   setAdminBetType('CLASSIC');
   openModal('modal-admin-create-bet');
@@ -724,6 +849,11 @@ async function confirmAdminCreateBet() {
   if (scheduledForStr) {
     payload.status = 'SCHEDULED';
     payload.scheduled_for = new Date(scheduledForStr).toISOString();
+  }
+
+  const expiresAtStr = document.getElementById('adm-create-expires-at')?.value;
+  if (expiresAtStr) {
+    payload.expires_at = new Date(expiresAtStr).toISOString();
   }
 
   if (currentCreateBetType === 'CLASSIC') {

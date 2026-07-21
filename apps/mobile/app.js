@@ -119,7 +119,8 @@ async function syncFromSupabase() {
         countMin: Number(b.count_min || 0),
         countMax: Number(b.count_max || 0),
         cameraLabel: b.camera_label || '',
-        cameraUrl: b.camera_url || ''
+        cameraUrl: b.camera_url || '',
+        expiresAt: b.expires_at ? new Date(b.expires_at).getTime() : null
       };
     });
   }
@@ -272,7 +273,8 @@ function initRealtimeSubscriptions() {
             countMin: Number(row.count_min || 0),
             countMax: Number(row.count_max || 0),
             cameraLabel: row.camera_label || '',
-            cameraUrl: row.camera_url || ''
+            cameraUrl: row.camera_url || '',
+            expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : null
           };
 
           // Anima atualização do contador em tempo real
@@ -290,6 +292,10 @@ function initRealtimeSubscriptions() {
 
           if ((row.status === 'CLOSED' || row.status === 'RESOLVED_A' || row.status === 'RESOLVED_B') && old && old.status === 'OPEN') {
             showSnackbar(`⚖️ Resultado do palpite "${row.title}" foi divulgado!`);
+            setTimeout(() => syncFromSupabase(), 800);
+          } else if (row.status === 'EXPIRED' && old && old.status === 'OPEN') {
+            showSnackbar(`⏰ Aposta "${row.title}" expirou! Valores serão reembolsados.`);
+            addNotification('⏰ Aposta Expirada', `"${row.title}" encerrou por tempo. Seu valor foi reembolsado.`, 'SYSTEM');
             setTimeout(() => syncFromSupabase(), 800);
           } else if (row.bet_type !== 'COUNTER' && old && (row.odds_a !== old.odds_a || row.odds_b !== old.odds_b)) {
             showSnackbar(`📊 Odds atualizadas: "${row.title}"`);
@@ -345,6 +351,9 @@ function initRealtimeSubscriptions() {
         } else if (row.status === 'LOST' && prev.status !== 'LOST') {
           showSnackbar('😔 Resultado divulgado — seu palpite não foi o vencedor dessa vez.');
           addNotification('😔 Resultado Divulgado', `Infelizmente seu palpite não foi o vencedor: ${prev.betTitle}`, 'RESULT');
+        } else if (row.status === 'REFUNDED' && prev.status !== 'REFUNDED') {
+          showSnackbar(`💸 Reembolso de R$ ${Number(row.potential_win).toFixed(2)} creditado! Aposta expirada.`);
+          addNotification('💸 Reembolso', `R$ ${Number(row.potential_win).toFixed(2)} devolvidos — "${prev.betTitle}" expirou.`, 'SYSTEM');
         }
         saveStore(store);
         renderCurrentTab();
@@ -722,8 +731,19 @@ function renderBetCard(bet, isTrending) {
         </button>
       </div>
       
-      <div class="bet-footer" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;">
+      <div class="bet-footer" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
         <span class="pool-text" style="color:var(--text-gray);font-size:0.75rem;">💰 Volume: R$ ${Math.round(bet.totalPool).toLocaleString('pt-BR')}</span>
+        ${bet.expiresAt ? (() => {
+          const diff = bet.expiresAt - Date.now();
+          if (diff > 0) {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const urgentColor = diff < 3600000 ? '#EF4444' : 'var(--gold-accent)';
+            return `<span style="font-size:0.7rem;font-weight:700;color:${urgentColor};">⏰ ${h}h ${m}min</span>`;
+          } else {
+            return `<span style="font-size:0.7rem;font-weight:700;color:#EF4444;">⏰ Encerrando...</span>`;
+          }
+        })() : ''}
       </div>
     </div>
   `;
@@ -1072,9 +1092,15 @@ function updatePayout() {
     document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(cash)}`;
   }
 
+  const pf = store.portfolios.find(p => p.betId === bet.id);
+  const ownedShares = pf ? (isA ? pf.sharesA : pf.sharesB) : 0;
+
   const err = document.getElementById('place-bet-error');
   if (tradeMode === 'BUY' && amount > getBalance()) {
     err.textContent = 'Saldo insuficiente para essa compra!';
+    err.style.display = 'block';
+  } else if (tradeMode === 'SELL' && amount > ownedShares) {
+    err.textContent = `Saldo insuficiente: você possui apenas ${ownedShares} cotas.`;
     err.style.display = 'block';
   } else {
     err.style.display = 'none';
@@ -1089,11 +1115,18 @@ function confirmPlaceBet() {
   const isA = placeBetTarget.option === 'A';
   const prob = (isA ? placeBetTarget.bet.poolA : placeBetTarget.bet.poolB) / placeBetTarget.bet.totalPool;
   
+  const pf = store.portfolios.find(p => p.betId === placeBetTarget.bet.id);
+  const ownedShares = pf ? (isA ? pf.sharesA : pf.sharesB) : 0;
+
   let shares = 0;
   if (tradeMode === 'BUY') {
     shares = Math.floor(amount / prob);
   } else {
     shares = amount; // user types shares to sell
+    if (shares > ownedShares) {
+      showSnackbar('Transação Bloqueada: Você não possui essas cotas para vender.');
+      return;
+    }
   }
   
   executePlaceBet(placeBetTarget.bet, placeBetTarget.option, amount, prob, shares);
@@ -1408,75 +1441,131 @@ function likePost(postId) {
 // ---- MY BETS TAB ----
 function renderMyBets() {
   const totalInvested = store.userBets.reduce((s, ub) => s + ub.amount, 0);
-  const pendingCount = store.userBets.filter(ub => ub.status === 'PENDING').length;
   const totalWon = store.userBets.filter(ub => ub.status === 'WON').reduce((s, ub) => s + ub.potentialWin, 0);
+  const activePositions = store.portfolios.filter(p => p.sharesA > 0 || p.sharesB > 0);
 
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Aplicado</div><div class="stat-value">${formatMoney(totalInvested)}</div></div>
     <div class="stat-card"><div class="stat-label">Retorno Ganho</div><div class="stat-value green">${formatMoney(totalWon)}</div></div>
-    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value gold">${pendingCount} slips</div></div>
+    <div class="stat-card"><div class="stat-label">Posições Ativas</div><div class="stat-value gold">${activePositions.length} ativas</div></div>
   `;
 
   const list = document.getElementById('my-bets-list');
-  if (store.userBets.length === 0) {
-    list.innerHTML = `<div class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><rect x="9" y="2" width="6" height="4" rx="1"/></svg>
-      <h3>Ainda não palpitou</h3>
-      <p>Vá para o Feed principal, selecione um tema e faça suas previsões!</p>
-    </div>`;
-    return;
-  }
-
-  const pendingBets = store.userBets.filter(ub => ub.status === 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
-  const closedBets = store.userBets.filter(ub => ub.status !== 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
-
   let html = '';
 
-  const renderCard = (ub) => {
-    const statusClass = ub.status === 'PENDING' ? 'pending' : (ub.status === 'WON' ? 'won' : 'lost');
-    const statusText = ub.status === 'PENDING' ? 'Em Aberto' : (ub.status === 'WON' ? 'Ganhou' : 'Perdeu');
-    return `
-      <div class="user-bet-card" style="${ub.status === 'PENDING' ? 'border: 1px solid var(--primary-color);' : ''}">
-        <div class="user-bet-header">
-          <span class="user-bet-title">${ub.betTitle}</span>
-          <span class="status-badge ${statusClass}">${statusText}</span>
-        </div>
-        <div class="user-bet-details">
-          <div class="detail-col">
-            <div class="detail-label">Opção Escolhida</div>
-            <div class="detail-value">${ub.chosenOptionText} ${ub.odds ? ub.odds.toFixed(2) : ''}</div>
+  if (activePositions.length > 0) {
+    html += `<h3 style="color:var(--text-white); margin-bottom:12px; display:flex; align-items:center; gap:8px;"><div class="camera-status-dot live" style="display:block;"></div> Minhas Cotas (Cashout)</h3>`;
+    
+    activePositions.forEach(p => {
+      const bet = store.bets.find(b => b.id === p.betId);
+      if (!bet) return;
+      
+      if (p.sharesA > 0) {
+        const probA = bet.poolA / bet.totalPool;
+        const cashoutValueA = p.sharesA * probA;
+        
+        html += `
+          <div class="user-bet-card" style="border: 1px solid var(--neon-emerald); background: rgba(16,185,129,0.05); cursor:pointer;" onclick="openBetDetails(${bet.id})">
+            <div class="user-bet-header">
+              <span class="user-bet-title">${bet.title}</span>
+              <span class="status-badge" style="background:var(--neon-emerald);color:#000;">POSIÇÃO ATIVA</span>
+            </div>
+            <div class="user-bet-details">
+              <div class="detail-col">
+                <div class="detail-label">Sua Opção</div>
+                <div class="detail-value" style="color:var(--text-white);font-weight:700;">${bet.optionA}</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Cotas Possuídas</div>
+                <div class="detail-value" style="color:var(--gold-accent);font-weight:700;">${p.sharesA} Cotas</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Valor P/ Cashout</div>
+                <div class="detail-value" style="color:var(--neon-emerald);font-weight:800;">${formatMoney(cashoutValueA)}</div>
+              </div>
+            </div>
+            <div class="user-bet-footer" style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); margin-top:10px;">
+              <span style="font-size:0.75rem; color:var(--text-gray);">Preço atual da cota: ${formatMoney(probA)}</span>
+              <span style="font-size:0.75rem; color:var(--neon-emerald); font-weight:700;">Clique para abrir e Vender</span>
+            </div>
           </div>
-          <div class="detail-col">
-            <div class="detail-label">Apostado</div>
-            <div class="detail-value">${formatMoney(ub.amount)}</div>
+        `;
+      }
+      
+      if (p.sharesB > 0) {
+        const probB = bet.poolB / bet.totalPool;
+        const cashoutValueB = p.sharesB * probB;
+        
+        html += `
+          <div class="user-bet-card" style="border: 1px solid #EF4444; background: rgba(239,68,68,0.05); cursor:pointer;" onclick="openBetDetails(${bet.id})">
+            <div class="user-bet-header">
+              <span class="user-bet-title">${bet.title}</span>
+              <span class="status-badge" style="background:#EF4444;color:#FFF;">POSIÇÃO ATIVA</span>
+            </div>
+            <div class="user-bet-details">
+              <div class="detail-col">
+                <div class="detail-label">Sua Opção</div>
+                <div class="detail-value" style="color:var(--text-white);font-weight:700;">${bet.optionB}</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Cotas Possuídas</div>
+                <div class="detail-value" style="color:var(--gold-accent);font-weight:700;">${p.sharesB} Cotas</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Valor P/ Cashout</div>
+                <div class="detail-value" style="color:var(--neon-emerald);font-weight:800;">${formatMoney(cashoutValueB)}</div>
+              </div>
+            </div>
+            <div class="user-bet-footer" style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); margin-top:10px;">
+              <span style="font-size:0.75rem; color:var(--text-gray);">Preço atual da cota: ${formatMoney(probB)}</span>
+              <span style="font-size:0.75rem; color:#EF4444; font-weight:700;">Clique para abrir e Vender</span>
+            </div>
           </div>
-          <div class="detail-col">
-            <div class="detail-label">Retorno Est.</div>
-            <div class="detail-value" style="color:${ub.status === 'WON' || ub.status === 'PENDING' ? 'var(--neon-emerald)' : 'var(--text-white)'}">${formatMoney(ub.potentialWin)}</div>
-          </div>
-        </div>
-        <div class="user-bet-footer">
-          <button class="share-btn" onclick="openShare(${ub.id})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            Compartilhar
-          </button>
-          <span class="bet-date">Apostado em: ${formatDate(ub.createdAt)}</span>
-        </div>
-      </div>
-    `;
-  };
-
-  if (pendingBets.length > 0) {
-    html += `<h3 style="color:var(--text-white); margin-bottom:12px; display:flex; align-items:center; gap:8px;"><div class="camera-status-dot live" style="display:block;"></div> Em Aberto</h3>`;
-    html += pendingBets.map(renderCard).join('');
+        `;
+      }
+    });
   }
 
+  const closedBets = store.userBets.filter(ub => ub.status !== 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
   if (closedBets.length > 0) {
-    html += `<h3 style="color:var(--text-gray); margin-top:24px; margin-bottom:12px;">Histórico de Resultados</h3>`;
-    html += closedBets.map(renderCard).join('');
+    html += `<h3 style="color:var(--text-gray); margin-top:24px; margin-bottom:12px;">Histórico de Transações</h3>`;
+    html += closedBets.map(ub => {
+       const statusClass = ub.status === 'WON' ? 'won' : 'lost';
+       const statusText = ub.status === 'WON' ? 'Ganhou' : 'Perdeu';
+       return `
+          <div class="user-bet-card">
+            <div class="user-bet-header">
+              <span class="user-bet-title">${ub.betTitle}</span>
+              <span class="status-badge ${statusClass}">${statusText}</span>
+            </div>
+            <div class="user-bet-details">
+              <div class="detail-col">
+                <div class="detail-label">Opção Escolhida</div>
+                <div class="detail-value">${ub.chosenOptionText}</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Apostado</div>
+                <div class="detail-value">${formatMoney(ub.amount)}</div>
+              </div>
+              <div class="detail-col">
+                <div class="detail-label">Retorno Est.</div>
+                <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : 'var(--text-white)'}">${formatMoney(ub.potentialWin)}</div>
+              </div>
+            </div>
+          </div>
+       `;
+    }).join('');
   }
 
-  list.innerHTML = html;
+  if (html === '') {
+    list.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><rect x="9" y="2" width="6" height="4" rx="1"/></svg>
+      <h3>Ainda não possui cotas</h3>
+      <p>Vá para o Feed principal, selecione um evento e compre suas primeiras cotas!</p>
+    </div>`;
+  } else {
+    list.innerHTML = html;
+  }
 }
 
 // ---- SHARE ----
@@ -1927,7 +2016,10 @@ function closeModal(id) {
 // Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.classList.remove('open');
+    // Não permite fechar o modal de login clicando fora
+    if (e.target === overlay && overlay.id !== 'modal-auth') {
+      overlay.classList.remove('open');
+    }
   });
 });
 
