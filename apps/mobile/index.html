@@ -249,16 +249,21 @@
           <input type="text" class="form-input" id="create-optB" value="Não">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Odds A</label>
-          <input type="number" class="form-input" id="create-oddsA" value="1.90" step="0.05" min="1.00">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Probabilidade Inicial (%)</label>
+            <input type="number" class="form-input" id="create-probA" value="50" step="1" min="1" max="99" oninput="document.getElementById('create-probB').value = 100 - this.value">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Probabilidade B (%)</label>
+            <input type="number" class="form-input" id="create-probB" value="50" step="1" min="1" max="99" oninput="document.getElementById('create-probA').value = 100 - this.value">
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Odds B</label>
-          <input type="number" class="form-input" id="create-oddsB" value="1.90" step="0.05" min="1.00">
+        <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px;">💰 Liquidez Inicial (R$)</label>
+          <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Será descontado do seu saldo e transformado nas primeiras cotas para garantir as probabilidades acima.</div>
+          <input type="number" class="form-input" id="create-liquidity" value="10.00" min="1" step="5" style="color:var(--neon-emerald);font-weight:bold;">
         </div>
-      </div>
       <button class="btn-primary" onclick="confirmCreateBet()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m-7-7h14"/></svg>
         Publicar Palpite (+100 XP)

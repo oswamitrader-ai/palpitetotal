@@ -1236,8 +1236,9 @@ function openCreateBet() {
   document.getElementById('create-desc').value = '';
   document.getElementById('create-optA').value = 'Sim';
   document.getElementById('create-optB').value = 'Não';
-  document.getElementById('create-oddsA').value = '1.90';
-  document.getElementById('create-oddsB').value = '1.90';
+  document.getElementById('create-probA').value = '50';
+  document.getElementById('create-probB').value = '50';
+  document.getElementById('create-liquidity').value = '10.00';
   openModal('modal-create-bet');
 }
 
@@ -1247,13 +1248,24 @@ async function confirmCreateBet() {
   const cat = document.getElementById('create-category').value;
   const optA = document.getElementById('create-optA').value.trim();
   const optB = document.getElementById('create-optB').value.trim();
-  const oddsA = parseFloat(document.getElementById('create-oddsA').value) || 1.90;
-  const oddsB = parseFloat(document.getElementById('create-oddsB').value) || 1.90;
+  const probA = parseFloat(document.getElementById('create-probA').value) || 50;
+  const probB = parseFloat(document.getElementById('create-probB').value) || 50;
+  const liquidity = parseFloat(document.getElementById('create-liquidity').value) || 10;
 
   if (!title || !desc || !optA || !optB) {
     showSnackbar('Preencha todos os campos!');
     return;
   }
+
+  if (liquidity <= 0 || liquidity > getBalance()) {
+    showSnackbar('Saldo insuficiente para injetar esta liquidez inicial!');
+    return;
+  }
+
+  const oddsA = probA > 0 ? (100 / probA) : 1.90;
+  const oddsB = probB > 0 ? (100 / probB) : 1.90;
+  const pA = liquidity * (probA / 100);
+  const pB = liquidity * (probB / 100);
 
   const creatorName = store.profile.username || 'Você';
   const newBetObj = {
@@ -1265,9 +1277,11 @@ async function confirmCreateBet() {
     option_b: optB,
     odds_a: oddsA,
     odds_b: oddsB,
+    pool_a: pA,
+    pool_b: pB,
     status: 'OPEN',
     is_trending: false,
-    total_pool: 0
+    total_pool: liquidity
   };
 
   let assignedId = store.nextBetId++;
@@ -1293,11 +1307,40 @@ async function confirmCreateBet() {
     optionB: optB,
     oddsA,
     oddsB,
+    poolA: pA,
+    poolB: pB,
     status: 'OPEN',
     isTrending: false,
-    totalPool: 0,
+    totalPool: liquidity,
     createdAt: Date.now()
   });
+
+  // Debita liquidez da carteira
+  store.transactions.push({
+    id: store.nextTxId++,
+    amount: -liquidity,
+    description: `Provisão de Liquidez: ${title}`,
+    type: 'LIQUIDITY_ADD',
+    timestamp: Date.now()
+  });
+
+  if (supabaseClient) {
+    supabaseClient.from('transactions').insert({
+      amount: -liquidity,
+      description: `Provisão de Liquidez: ${title}`,
+      type: 'LIQUIDITY_ADD',
+      status: 'COMPLETED',
+      username: store.profile.username
+    }).then();
+    
+    supabaseClient.from('user_portfolios').insert({
+      bet_id: assignedId,
+      user_id: store.profile.username,
+      username: store.profile.username,
+      shares_a: pA,
+      shares_b: pB
+    }).then();
+  }
 
   addXp(100);
   simulateTrendingNewBetAlert(title, cat);

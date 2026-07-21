@@ -839,13 +839,27 @@ async function confirmAdminCreateBet() {
 
   const scheduledForStr = document.getElementById('adm-create-scheduled-for')?.value;
 
-  const pA = liquidity / 2;
-  const pB = liquidity / 2;
+  let pA, pB, oddsA, oddsB;
+
+  if (currentCreateBetType === 'CLASSIC') {
+    const probA = parseFloat(document.getElementById('adm-create-probA').value) || 50;
+    const probB = parseFloat(document.getElementById('adm-create-probB').value) || 50;
+    oddsA = probA > 0 ? (100 / probA) : 1.90;
+    oddsB = probB > 0 ? (100 / probB) : 1.90;
+    pA = liquidity * (probA / 100);
+    pB = liquidity * (probB / 100);
+  } else {
+    // Para modo contador ou outros
+    pA = liquidity / 2;
+    pB = liquidity / 2;
+    oddsA = 1.90;
+    oddsB = 1.90;
+  }
 
   let payload = {
     title, description: desc, category: cat,
     creator_name: 'Soberano Admin',
-    odds_a: 1.90, odds_b: 1.90,
+    odds_a: oddsA, odds_b: oddsB,
     pool_a: pA, pool_b: pB,
     status: 'OPEN', is_trending: true, total_pool: liquidity
   };
