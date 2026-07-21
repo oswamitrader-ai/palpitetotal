@@ -1116,7 +1116,10 @@ function confirmPlaceBet() {
   if (!placeBetTarget) return;
   const amount = parseFloat(document.getElementById('place-bet-amount').value) || 0;
   if (amount <= 0) return;
-  
+  if (amount > getBalance()) {
+    showSnackbar('Saldo insuficiente!');
+    return;
+  }
   const isA = placeBetTarget.option === 'A';
   const prob = (isA ? placeBetTarget.bet.poolA : placeBetTarget.bet.poolB) / placeBetTarget.bet.totalPool;
   
