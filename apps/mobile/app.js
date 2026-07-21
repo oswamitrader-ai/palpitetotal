@@ -14,7 +14,7 @@ if (window.supabase && window.supabase.createClient) {
 let isLoggedIn = localStorage.getItem('palpitetotal_logged_in') === 'true';
 
 // ---- DATA STORE (localStorage + Supabase backed) ----
-const STORE_KEY = 'palpitetotal_data';
+const STORE_KEY = 'palpitetotal_data_v2';
 
 function getDefaultStore() {
   return {
