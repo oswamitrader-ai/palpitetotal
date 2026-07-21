@@ -676,12 +676,13 @@ function renderWallet() {
 
     const sign = tx.amount >= 0 ? '+' : '';
     const amtClass = tx.amount >= 0 ? 'positive' : 'negative';
+    const pendingTag = tx.status === 'PENDING' ? '<span style="color:var(--gold-accent);font-size:0.65rem;font-weight:bold;margin-left:6px;background:rgba(245,158,11,0.2);padding:2px 6px;border-radius:4px;">PENDENTE</span>' : '';
     return `
       <div class="tx-card">
         <div class="tx-left">
           <div class="tx-icon ${iconClass}">${iconSvg}</div>
           <div>
-            <div class="tx-desc">${tx.description}</div>
+            <div class="tx-desc" style="display:flex;align-items:center;">${tx.description}${pendingTag}</div>
             <div class="tx-date">${formatDate(tx.timestamp)}</div>
           </div>
         </div>
@@ -696,16 +697,34 @@ function openDeposit() {
   openModal('modal-deposit');
 }
 
-function confirmDeposit() {
+async function confirmDeposit() {
   const amount = parseFloat(document.getElementById('deposit-amount').value) || 0;
   if (amount <= 0) { showSnackbar('Valor inválido!'); return; }
+  
+  let assignedTxId = store.nextTxId++;
+
+  if (supabaseClient) {
+    try {
+      const { data } = await supabaseClient.from('transactions').insert({
+        amount: amount,
+        description: `Depósito via Pix Seguro`,
+        type: 'DEPOSIT',
+        status: 'PENDING',
+        username: store.profile.username
+      }).select();
+      if (data && data[0]) assignedTxId = Number(data[0].id);
+    } catch (e) {
+      console.warn('Erro ao registrar depósito no Supabase:', e);
+    }
+  }
+
   store.transactions.push({
-    id: store.nextTxId++, amount, description: 'Depósito via Pix Seguro',
-    type: 'DEPOSIT', timestamp: Date.now()
+    id: assignedTxId, amount, description: 'Depósito via Pix Seguro',
+    type: 'DEPOSIT', status: 'PENDING', timestamp: Date.now()
   });
   saveStore(store);
   closeModal('modal-deposit');
-  showSnackbar(`R$ ${amount.toFixed(2)} depositados com sucesso!`);
+  showSnackbar(`R$ ${amount.toFixed(2)} depositados. Aguardando aprovação!`);
   renderCurrentTab();
 }
 
@@ -715,17 +734,35 @@ function openWithdraw() {
   openModal('modal-withdraw');
 }
 
-function confirmWithdraw() {
+async function confirmWithdraw() {
   const amount = parseFloat(document.getElementById('withdraw-amount').value) || 0;
   if (amount <= 0) { showSnackbar('Valor inválido!'); return; }
   if (amount > getBalance()) { showSnackbar('Saldo insuficiente!'); return; }
+  
+  let assignedTxId = store.nextTxId++;
+
+  if (supabaseClient) {
+    try {
+      const { data } = await supabaseClient.from('transactions').insert({
+        amount: -amount,
+        description: `Saque Rápido via Pix Realizado`,
+        type: 'WITHDRAWAL',
+        status: 'PENDING',
+        username: store.profile.username
+      }).select();
+      if (data && data[0]) assignedTxId = Number(data[0].id);
+    } catch (e) {
+      console.warn('Erro ao registrar saque no Supabase:', e);
+    }
+  }
+
   store.transactions.push({
-    id: store.nextTxId++, amount: -amount, description: 'Saque Rápido via Pix Realizado',
-    type: 'WITHDRAWAL', timestamp: Date.now()
+    id: assignedTxId, amount: -amount, description: 'Saque Rápido via Pix Realizado',
+    type: 'WITHDRAWAL', status: 'PENDING', timestamp: Date.now()
   });
   saveStore(store);
   closeModal('modal-withdraw');
-  showSnackbar(`R$ ${amount.toFixed(2)} sacados com sucesso!`);
+  showSnackbar(`R$ ${amount.toFixed(2)} solicitados para saque. Aguardando aprovação!`);
   renderCurrentTab();
 }
 
