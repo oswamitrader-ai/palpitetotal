@@ -1,0 +1,25 @@
+{
+  "appId": "com.palpitetotal.app",
+  "appName": "PalpiteTotal",
+  "webDir": "apps/mobile",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0F172A"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    }
+  },
+  "android": {
+    "backgroundColor": "#0F172A"
+  },
+  "ios": {
+    "backgroundColor": "#0F172A",
+    "contentInset": "automatic"
+  }
+}

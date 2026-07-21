@@ -1,0 +1,9 @@
+{
+  "name": "@palpitetotal/mobile",
+  "version": "1.0.0",
+  "description": "App móvel de apostas PalpiteTotal",
+  "scripts": {
+    "dev": "npx -y lite-server -c bs-config.json --port=3000",
+    "dev:mobile": "npx -y lite-server -c bs-config.json --port=3000"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "PalpiteTotal",
+  "description": "Um aplicativo de apostas online intuitivo para apostar em tudo: clima, política, situações cotidianas, com uma carteira virtual segura e feed de tendências.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

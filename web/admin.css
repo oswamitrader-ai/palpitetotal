@@ -1,0 +1,248 @@
+/* =============================================
+   ADMIN CRM STYLESHEET - PALPITETOTAL SOBERANO
+   ============================================= */
+
+body.admin-body {
+  background: var(--slate-dark);
+  color: var(--text-white);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* =============================================
+   ADMIN LOGIN OVERLAY
+   ============================================= */
+.admin-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: radial-gradient(circle at center, #1E293B 0%, #0F172A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-login-card {
+  background: var(--card-dark);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 30px rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+
+.admin-login-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-login-header svg {
+  width: 32px;
+  height: 32px;
+  color: var(--neon-emerald);
+}
+
+.admin-login-header span {
+  font-weight: 900;
+  font-size: 1.4rem;
+  color: var(--text-white);
+  letter-spacing: -0.5px;
+}
+
+/* =============================================
+   ADMIN MAIN LAYOUT
+   ============================================= */
+.admin-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-header {
+  height: 60px;
+  background: #0B1120;
+  border-bottom: 1px solid rgba(148,163,184,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 900;
+  font-size: 1.2rem;
+}
+
+.admin-brand svg {
+  width: 26px;
+  height: 26px;
+  color: var(--neon-emerald);
+}
+
+.badge-admin-tag {
+  background: rgba(245,158,11,0.15);
+  color: var(--gold-accent);
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 800;
+  margin-left: 8px;
+}
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-dark);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(148,163,184,0.1);
+}
+
+.admin-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--neon-emerald);
+  color: var(--slate-dark);
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.admin-user-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-white);
+}
+
+.admin-user-role {
+  font-size: 0.6rem;
+  color: var(--neon-emerald);
+}
+
+/* =============================================
+   SIDEBAR + MAIN CONTENT
+   ============================================= */
+.admin-main-wrapper {
+  display: flex;
+  flex: 1;
+}
+
+.admin-sidebar {
+  width: 240px;
+  background: #0D1527;
+  border-right: 1px solid rgba(148,163,184,0.08);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-gray);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+.admin-nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.admin-nav-item:hover {
+  background: rgba(30,41,59,0.8);
+  color: var(--text-white);
+}
+
+.admin-nav-item.active {
+  background: var(--neon-emerald);
+  color: var(--slate-dark);
+  font-weight: 800;
+}
+
+.admin-nav-item.active svg {
+  color: var(--slate-dark);
+}
+
+.admin-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  max-width: 1200px;
+}
+
+.admin-tab-page {
+  display: none;
+}
+
+.admin-tab-page.active {
+  display: block;
+}
+
+.page-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Responsive Sidebar */
+@media (max-width: 768px) {
+  .admin-main-wrapper {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(148,163,184,0.08);
+    padding: 8px 12px;
+  }
+  .admin-nav-item {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .admin-content {
+    padding: 16px;
+  }
+}

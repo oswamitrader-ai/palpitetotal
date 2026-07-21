@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0F172A">
+  <title>PalpiteTotal - Painel Administrativo & CRM Soberano</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+  <!-- ========== ADMIN LOGIN SCREEN ========== -->
+  <div id="admin-login-screen" class="admin-login-overlay">
+    <div class="admin-login-card">
+      <div class="admin-login-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/></svg>
+        <span>PalpiteTotal CRM</span>
+      </div>
+      <h2 style="font-weight:800;font-size:1.2rem;color:var(--text-white);text-align:center;margin-bottom:6px;">Acesso Restrito - Administrador</h2>
+      <p style="font-size:0.75rem;color:var(--text-gray);text-align:center;margin-bottom:18px;">Entre com as credenciais do Soberano para gerenciar a plataforma.</p>
+      
+      <div class="form-group">
+        <label class="form-label">E-mail Administrativo</label>
+        <input type="email" class="form-input" id="admin-email" value="oswamitrader@gmail.com" placeholder="admin@palpitetotal.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha Master</label>
+        <input type="password" class="form-input" id="admin-password" value="Jnior19!8495" placeholder="••••••••">
+      </div>
+      <div class="form-error" id="admin-login-error" style="display:none"></div>
+
+      <button class="btn-primary" style="margin-top:10px;" onclick="handleAdminLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Entrar no Painel CRM
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== MAIN ADMIN APP CONTAINER ========== -->
+  <div id="admin-app-container" class="admin-layout" style="display:none">
+    
+    <!-- TOP HEADER -->
+    <header class="admin-header">
+      <div class="admin-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/></svg>
+        <span>PalpiteTotal <span class="badge-admin-tag">CRM SOBERANO</span></span>
+      </div>
+
+      <div class="admin-header-actions">
+        <div id="realtime-indicator" style="display:none;align-items:center;gap:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:20px;padding:4px 10px;font-size:0.7rem;font-weight:700;color:var(--neon-emerald);">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--neon-emerald);animation:pulse-dot 1.5s infinite;display:inline-block;"></span>
+          LIVE
+        </div>
+        <div class="admin-profile-chip">
+          <div class="admin-avatar">A</div>
+          <div>
+            <div class="admin-user-name" id="admin-display-name">oswamitrader@gmail.com</div>
+            <div class="admin-user-role">Super Admin</div>
+          </div>
+        </div>
+        <button class="btn-secondary" style="padding:6px 12px;font-size:0.75rem;min-height:36px;width:auto;" onclick="handleAdminLogout()">Sair</button>
+      </div>
+    </header>
+
+    <!-- ADMIN CONTENT WRAPPER -->
+    <div class="admin-main-wrapper">
+      
+      <!-- SIDEBAR NAVIGATION -->
+      <aside class="admin-sidebar">
+        <button class="admin-nav-item active" id="nav-dash" onclick="switchAdminTab('dash')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Dashboard & Finanças</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-soberano" onclick="switchAdminTab('soberano')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 2-3 3-3-3"/><path d="M4 7h16l-2 13H6L4 7z"/><path d="M9 12v4"/><path d="M15 12v4"/></svg>
+          <span>Soberano & Liquidação</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-users" onclick="switchAdminTab('users')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Gestão de Apostadores</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-withdrawals" onclick="switchAdminTab('withdrawals')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12l10-10 10 10"/></svg>
+          <span>💸 Saques Pendentes</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-payments" onclick="switchAdminTab('payments')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span>📋 Detalhes de Pagamentos</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-audit" onclick="switchAdminTab('audit')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Auditoria de Transações</span>
+        </button>
+
+        <button class="admin-nav-item" id="nav-settings" onclick="switchAdminTab('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Regras & Monetização</span>
+        </button>
+      </aside>
+
+      <!-- TAB CONTENTS -->
+      <main class="admin-content">
+        
+        <!-- DASHBOARD TAB -->
+        <div class="admin-tab-page active" id="admin-tab-dash">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">Dashboard Executivo CRM</h1>
+              <p class="section-subtitle">Métricas do ecossistema PalpiteTotal sincronizadas com o banco de dados.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="loadAdminData()">🔄 Atualizar Dados</button>
+          </div>
+
+          <!-- Métricas Cards -->
+          <div class="crm-metrics-grid" style="margin-bottom:20px;">
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Volume Total de Apostas</div>
+              <div class="crm-metric-value green" id="adm-volume">R$ 0,00</div>
+              <div class="crm-metric-sub">Soma real das apostas realizadas</div>
+            </div>
+
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Receita da Casa (GGR)</div>
+              <div class="crm-metric-value gold" id="adm-ggr">R$ 0,00</div>
+              <div class="crm-metric-sub">Apostas − Prêmios pagos</div>
+            </div>
+
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Prêmios Pagos (Payouts)</div>
+              <div class="crm-metric-value orange" id="adm-payouts">R$ 0,00</div>
+              <div class="crm-metric-sub">Distribuídos aos ganhadores</div>
+            </div>
+
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Apostadores Registrados</div>
+              <div class="crm-metric-value" id="adm-users-count">0</div>
+              <div class="crm-metric-sub">Base total de usuários</div>
+            </div>
+
+
+          </div>
+
+          <!-- Gráficos Neon (Chart.js) -->
+          <div class="crm-charts-grid">
+            <div class="crm-chart-card">
+              <div class="crm-chart-header">
+                <span class="crm-chart-title">🥧 Distribuição de Palpites por Categoria</span>
+              </div>
+              <div class="chart-container" style="height:260px;">
+                <canvas id="admCategoryChart"></canvas>
+              </div>
+            </div>
+
+            <div class="crm-chart-card">
+              <div class="crm-chart-header">
+                <span class="crm-chart-title">📊 Desempenho Financeiro (Volume vs Payouts)</span>
+              </div>
+              <div class="chart-container" style="height:260px;">
+                <canvas id="admFinancialChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SAQUES PENDENTES TAB -->
+        <div class="admin-tab-page" id="admin-tab-withdrawals">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">💸 Gestão de Saques</h1>
+              <p class="section-subtitle">Saques solicitados pelos apostadores via Pix. Aprovar libera o pagamento, Rejeitar estorna o saldo ao usuário.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="loadAdminData()">🔄 Atualizar</button>
+          </div>
+          <div id="adm-withdrawals-table"></div>
+        </div>
+
+        <!-- DETALHES DE PAGAMENTOS TAB -->
+        <div class="admin-tab-page" id="admin-tab-payments">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">📋 Detalhes de Depósitos & Saques Pagos</h1>
+              <p class="section-subtitle">Extrato detalhado de todas as movimentações financeiras Pix com comprovantes de transação.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="loadAdminData()">🔄 Atualizar Extrato</button>
+          </div>
+
+          <!-- Métricas Específicas de Pagamentos -->
+          <div class="crm-metrics-grid" style="margin-bottom:20px;">
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Total de Depósitos (Pix)</div>
+              <div class="crm-metric-value green" id="pay-total-deposits">R$ 0,00</div>
+              <div class="crm-metric-sub" id="pay-deposits-count">0 transações</div>
+            </div>
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Total de Saques Pagos</div>
+              <div class="crm-metric-value orange" id="pay-total-withdrawals">R$ 0,00</div>
+              <div class="crm-metric-sub" id="pay-withdrawals-count">0 saques aprovados</div>
+            </div>
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Saldo Líquido de Caixa</div>
+              <div class="crm-metric-value gold" id="pay-net-balance">R$ 0,00</div>
+              <div class="crm-metric-sub">Entradas Pix − Saídas Pix</div>
+            </div>
+            <div class="crm-metric-card">
+              <div class="crm-metric-title">Volume Total Processado</div>
+              <div class="crm-metric-value" id="pay-total-volume">R$ 0,00</div>
+              <div class="crm-metric-sub">Giro financeiro da carteira</div>
+            </div>
+          </div>
+
+          <!-- Filtros de Pagamento -->
+          <div class="chips-row" style="margin-bottom:16px;">
+            <button class="chip active" id="pay-filter-ALL" onclick="setPaymentFilter('ALL')">Todas as Operações</button>
+            <button class="chip" id="pay-filter-DEPOSIT" onclick="setPaymentFilter('DEPOSIT')">💳 Depósitos Pix</button>
+            <button class="chip" id="pay-filter-APPROVED" onclick="setPaymentFilter('APPROVED')">✅ Saques Aprovados</button>
+            <button class="chip" id="pay-filter-REJECTED" onclick="setPaymentFilter('REJECTED')">❌ Saques Rejeitados</button>
+          </div>
+
+          <!-- Tabela de Detalhes de Pagamentos -->
+          <div id="adm-payments-table"></div>
+        </div>
+
+        <!-- SOBERANO & LIQUIDAÇÃO TAB -->
+        <div class="admin-tab-page" id="admin-tab-soberano">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">Soberano - Liquidação de Palpites ⚖️</h1>
+              <p class="section-subtitle">Defina os vencedores de apostas abertas com distribuição automática de saldo aos apostadores.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="openAdminCreateBetModal()">+ Criar Novo Palpite Oficial</button>
+          </div>
+
+          <!-- Filtro Abertas / Encerradas -->
+          <div class="manage-toggle" style="max-width:320px;margin-bottom:16px;">
+            <button class="manage-toggle-btn active" id="adm-filter-open" onclick="setAdminBetFilter('OPEN')">Apostas Abertas (<span id="adm-open-count">0</span>)</button>
+            <button class="manage-toggle-btn" id="adm-filter-closed" onclick="setAdminBetFilter('CLOSED')">Resolvidas (<span id="adm-closed-count">0</span>)</button>
+          </div>
+
+          <div id="adm-bets-list"></div>
+        </div>
+
+        <!-- GESTÃO DE APOSTADORES TAB -->
+        <div class="admin-tab-page" id="admin-tab-users">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">CRM - Gestão de Apostadores 👥</h1>
+              <p class="section-subtitle">Controle total de usuários registrados: edite nome, e-mail, senha, nível, XP, ajuste saldos e conceda bônus.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="openAdminCreateUserModal()">+ Cadastrar Apostador</button>
+          </div>
+
+          <!-- Barra de Busca de Apostadores -->
+          <div class="search-wrapper" style="max-width:400px;margin-bottom:16px;">
+            <input type="search" class="form-input" id="adm-user-search" placeholder="🔍 Buscar por nome, e-mail ou nível..." oninput="renderAdminUsersView(this.value)">
+          </div>
+
+          <div class="crm-section">
+            <div id="adm-users-table"></div>
+          </div>
+        </div>
+
+        <!-- AUDITORIA DE TRANSAÇÕES TAB -->
+        <div class="admin-tab-page" id="admin-tab-audit">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">Auditoria Global de Transações 📜</h1>
+              <p class="section-subtitle">Histórico completo de depósitos Pix, saques, apostas realizadas e pague-outs.</p>
+            </div>
+          </div>
+
+          <div class="crm-section">
+            <div id="adm-audit-table"></div>
+          </div>
+        </div>
+
+        <!-- REGRAS & MONETIZAÇÃO TAB -->
+        <div class="admin-tab-page" id="admin-tab-settings">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">Regras de Negócio & Monetização ⚙️</h1>
+              <p class="section-subtitle">Gerencie porcentagens de royalties dos criadores, recompensas de XP e margem da casa.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="savePlatformSettings()">💾 Salvar Regras no Banco</button>
+          </div>
+
+          <div class="crm-section" style="max-width:800px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+              <div class="form-group">
+                <label class="form-label" style="color:var(--gold-accent);font-weight:700;">👑 Royalty do Criador de Palpites (%)</label>
+                <input type="number" class="form-input" id="set-royalty" step="0.5" min="0" max="20" placeholder="3.0">
+                <span style="font-size:0.7rem;color:var(--text-gray);">Porcentagem do pool paga ao usuário que criou o palpite.</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">🏠 Margem Padrão da Casa / Vig (%)</label>
+                <input type="number" class="form-input" id="set-house-margin" step="0.5" min="0" max="30" placeholder="8.0">
+                <span style="font-size:0.7rem;color:var(--text-gray);">Margem de retenção sobre odds (GGR).</span>
+              </div>
+            </div>
+
+            <h3 style="font-weight:700;font-size:1rem;color:var(--text-white);margin-bottom:14px;border-bottom:1px solid var(--border-slate);padding-bottom:8px;">⚡ Recompensas de Gamificação (XP)</h3>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+              <div class="form-group">
+                <label class="form-label">XP por Criar Novo Palpite</label>
+                <input type="number" class="form-input" id="set-xp-create" step="10" min="0" placeholder="100">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">XP por Confirmar Palpite</label>
+                <input type="number" class="form-input" id="set-xp-place" step="10" min="0" placeholder="50">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">XP por Compartilhar no Feed</label>
+                <input type="number" class="form-input" id="set-xp-share" step="10" min="0" placeholder="50">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">XP por Indicar um Amigo</label>
+                <input type="number" class="form-input" id="set-xp-referral" step="50" min="0" placeholder="300">
+              </div>
+            </div>
+
+            <h3 style="font-weight:700;font-size:1rem;color:var(--text-white);margin-bottom:14px;border-bottom:1px solid var(--border-slate);padding-bottom:8px;">🎁 Bônus de Cadastro</h3>
+
+            <div class="form-group" style="max-width:380px;">
+              <label class="form-label">Valor do Bônus de Boas-Vindas (R$)</label>
+              <input type="number" class="form-input" id="set-welcome-bonus" step="50" min="0" placeholder="1000">
+              <span style="font-size:0.7rem;color:var(--text-gray);">Creditado automaticamente na carteira de novos cadastros.</span>
+            </div>
+
+            <button class="btn-primary" style="margin-top:10px;" onclick="savePlatformSettings()">💾 Aplicar Alterações no Ecossistema</button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal para Criar Aposta Oficial pelo Admin -->
+  <div class="modal-overlay" id="modal-admin-create-bet">
+    <div class="modal-card" style="max-width:520px;">
+      <div class="modal-header">
+        <span class="modal-title">🎲 Lançar Novo Palpite</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-create-bet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <!-- Seletor de tipo de aposta -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div id="type-classic-btn" onclick="setAdminBetType('CLASSIC')" style="background:rgba(16,185,129,0.15);border:2px solid var(--neon-emerald);border-radius:12px;padding:12px;text-align:center;cursor:pointer;">
+          <div style="font-size:1.4rem;margin-bottom:4px;">🎯</div>
+          <div style="font-size:0.75rem;font-weight:800;color:var(--neon-emerald);">Clássico</div>
+          <div style="font-size:0.62rem;color:var(--text-gray);">Opção A ou B</div>
+        </div>
+        <div id="type-counter-btn" onclick="setAdminBetType('COUNTER')" style="background:rgba(99,102,241,0.08);border:2px solid rgba(99,102,241,0.2);border-radius:12px;padding:12px;text-align:center;cursor:pointer;">
+          <div style="font-size:1.4rem;margin-bottom:4px;">📹</div>
+          <div style="font-size:0.75rem;font-weight:800;color:#A78BFA;">Contagem Ao Vivo</div>
+          <div style="font-size:0.62rem;color:var(--text-gray);">Câmera + Contador</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Título da Aposta</label>
+        <input type="text" class="form-input" id="adm-create-title" placeholder="Ex: Quantos veículos passarão na Av. Paulista até às 18h?">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição & Regras</label>
+        <textarea class="form-textarea" id="adm-create-desc" placeholder="Critérios oficiais de resolução..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select class="form-select" id="adm-create-category">
+          <option value="Tempo">Tempo</option>
+          <option value="Política">Política</option>
+          <option value="Esportes">Esportes</option>
+          <option value="Dia-a-dia" selected>Dia-a-dia</option>
+          <option value="Entretenimento">Entretenimento</option>
+          <option value="Contagem">Contagem Ao Vivo 📹</option>
+        </select>
+      </div>
+
+      <!-- CAMPOS CLÁSSICOS -->
+      <div id="classic-fields">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Opção A</label>
+            <input type="text" class="form-input" id="adm-create-optA" value="Sim">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Opção B</label>
+            <input type="text" class="form-input" id="adm-create-optB" value="Não">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Odds Opção A</label>
+            <input type="number" class="form-input" id="adm-create-oddsA" value="1.90" step="0.05">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Odds Opção B</label>
+            <input type="number" class="form-input" id="adm-create-oddsB" value="1.90" step="0.05">
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMPOS DE CONTAGEM -->
+      <div id="counter-fields" style="display:none;">
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:0.7rem;font-weight:800;color:#A78BFA;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">📹 Configuração da Câmera</div>
+          <div class="form-group">
+            <label class="form-label">Local / Endereço</label>
+            <input type="text" class="form-input" id="adm-create-location" placeholder="Ex: Av. Paulista, 1000 — Sentido Consolação">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group">
+              <label class="form-label">O que contar?</label>
+              <select class="form-select" id="adm-create-subject">
+                <option value="pessoas">🚶 Pessoas</option>
+                <option value="veículos">🚗 Veículos</option>
+                <option value="ônibus">🚌 Ônibus</option>
+                <option value="motos">🏍️ Motos</option>
+                <option value="bicicletas">🚲 Bicicletas</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ID da Câmera</label>
+              <input type="text" class="form-input" id="adm-create-camera-label" placeholder="Ex: CAM-SP-001">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:0.7rem;font-weight:800;color:var(--gold-accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">🎯 Meta e Apostas</div>
+          <div class="form-group">
+            <label class="form-label">Meta de Contagem (número alvo)</label>
+            <input type="number" class="form-input" id="adm-create-target" placeholder="Ex: 500" min="1">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group">
+              <label class="form-label">Opção ACIMA (Odds)</label>
+              <input type="number" class="form-input" id="adm-create-oddsA" value="1.90" step="0.05">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Opção ABAIXO (Odds)</label>
+              <input type="number" class="form-input" id="adm-create-oddsB" value="1.90" step="0.05">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="confirmAdminCreateBet()">🚀 Lançar Aposta Oficial</button>
+    </div>
+  </div>
+
+  <!-- Modal para Editar Aposta e Ajustar Odds em Andamento -->
+  <div class="modal-overlay" id="modal-admin-edit-bet">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header">
+        <span class="modal-title">✏️ Editar Aposta & Odds em Andamento</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-edit-bet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <input type="hidden" id="adm-edit-id">
+
+      <div class="form-group">
+        <label class="form-label">Título da Aposta</label>
+        <input type="text" class="form-input" id="adm-edit-title">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição / Critérios</label>
+        <textarea class="form-textarea" id="adm-edit-desc"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select class="form-select" id="adm-edit-category">
+          <option value="Tempo">Tempo</option>
+          <option value="Política">Política</option>
+          <option value="Esportes">Esportes</option>
+          <option value="Dia-a-dia">Dia-a-dia</option>
+          <option value="Entretenimento">Entretenimento</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Opção A</label>
+          <input type="text" class="form-input" id="adm-edit-optA">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Opção B</label>
+          <input type="text" class="form-input" id="adm-edit-optB">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Odds Opção A (Live)</label>
+          <input type="number" class="form-input" id="adm-edit-oddsA" step="0.05" min="1.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Odds Opção B (Live)</label>
+          <input type="number" class="form-input" id="adm-edit-oddsB" step="0.05" min="1.01">
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="confirmAdminEditBet()">💾 Salvar Alterações e Atualizar Odds</button>
+    </div>
+  </div>
+
+  <!-- Receipt Detail Modal -->
+  <div class="modal-overlay" id="modal-admin-receipt">
+    <div class="modal-card" style="max-width:440px;background:#0F172A;border:1px solid rgba(16,185,129,0.3);">
+      <div class="modal-header">
+        <span class="modal-title">🧾 Comprovante de Operação Pix</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-receipt')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <div id="receipt-content" style="background:#1E293B;padding:18px;border-radius:12px;font-size:0.8rem;color:var(--text-white);">
+        <!-- Injetado via JS -->
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+        <button class="btn-secondary" onclick="closeModal('modal-admin-receipt')">Fechar</button>
+        <button class="btn-primary" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div class="modal-overlay" id="modal-admin-edit-user">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header">
+        <span class="modal-title">✏️ Editar Apostador CRM</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-edit-user')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <input type="hidden" id="adm-user-edit-id">
+
+      <div class="form-group">
+        <label class="form-label">Nome de Usuário (Username)</label>
+        <input type="text" class="form-input" id="adm-user-edit-name" placeholder="Ex: VidenteDasOdds">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">E-mail do Apostador</label>
+        <input type="email" class="form-input" id="adm-user-edit-email" placeholder="usuario@email.com">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nova Senha (deixe em branco se não quiser alterar)</label>
+        <input type="password" class="form-input" id="adm-user-edit-pass" placeholder="••••••••">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Nível</label>
+          <input type="number" class="form-input" id="adm-user-edit-level" min="1" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pontos de XP</label>
+          <input type="number" class="form-input" id="adm-user-edit-xp" min="0" step="50">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">💰 Corrigir / Ajustar Saldo Atual (R$)</label>
+        <input type="number" class="form-input" id="adm-user-edit-balance" step="0.50" min="0" placeholder="0.00">
+        <p style="font-size:0.65rem;color:var(--text-gray);margin-top:4px;">Se você alterar este valor, uma transação de ajuste de saldo será lançada automaticamente no banco de dados.</p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:10px;">
+        <button class="btn-primary" onclick="confirmAdminEditUser()">💾 Salvar Dados</button>
+        <button class="btn-secondary" style="background:rgba(239,68,68,0.2);color:#EF4444;" onclick="deleteAdminUserFromModal()">🗑️ Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User Modal -->
+  <div class="modal-overlay" id="modal-admin-create-user">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header">
+        <span class="modal-title">👤 Cadastrar Novo Apostador</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-create-user')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nome de Usuário</label>
+        <input type="text" class="form-input" id="adm-user-create-name" placeholder="Ex: MestreDasBets">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" class="form-input" id="adm-user-create-email" placeholder="apostador@email.com">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha Inicial</label>
+        <input type="password" class="form-input" id="adm-user-create-pass" placeholder="••••••••">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Saldo Inicial (R$)</label>
+          <input type="number" class="form-input" id="adm-user-create-balance" value="100" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nível Inicial</label>
+          <input type="number" class="form-input" id="adm-user-create-level" value="1" min="1">
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="confirmAdminCreateUser()">✨ Cadastrar Apostador no Sistema</button>
+    </div>
+  </div>
+
+  <!-- Bonus Modal -->
+  <div class="modal-overlay" id="modal-admin-user-bonus">
+    <div class="modal-card" style="max-width:420px;">
+      <div class="modal-header">
+        <span class="modal-title">🎁 Conceder Bônus Personalizado</span>
+        <button class="modal-close" onclick="closeModal('modal-admin-user-bonus')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <input type="hidden" id="adm-bonus-username">
+      <p id="adm-bonus-target-text" style="font-size:0.85rem;color:var(--text-white);font-weight:700;margin-bottom:14px;"></p>
+
+      <div class="form-group">
+        <label class="form-label">Valor do Bônus (R$)</label>
+        <input type="number" class="form-input" id="adm-bonus-amount" placeholder="50" min="1" step="5">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Motivo / Descrição do Bônus</label>
+        <input type="text" class="form-input" id="adm-bonus-reason" value="Bônus Fidelidade CRM Admin" placeholder="Ex: Bônus de Boas-Vindas Especial">
+      </div>
+
+      <button class="btn-primary" onclick="confirmAdminGrantBonus()">🎉 Injetar Bônus na Carteira</button>
+    </div>
+  </div>
+
+  <!-- Snackbar -->
+  <div class="snackbar" id="snackbar"></div>
+
+  <!-- Modal: Controle do Contador Ao Vivo (BOTTOM SHEET) -->
+  <div class="bottom-sheet-overlay" id="modal-counter-control">
+    <div class="bottom-sheet-card">
+      <div class="bottom-sheet-header">
+        <span class="bottom-sheet-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14v-4z"/><rect x="3" y="6" width="12" height="12" rx="2" ry="2"/></svg>
+          Painel de Comando Ultra - Contagem Ao Vivo
+        </span>
+        <button class="bottom-sheet-close" onclick="closeModal('modal-counter-control')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="bottom-sheet-body">
+        <input type="hidden" id="ctrl-counter-bet-id">
+        <div style="text-align:center;font-size:0.8rem;color:var(--text-gray);margin-bottom:20px;" id="ctrl-counter-location"></div>
+
+        <div class="counter-command-grid">
+          <!-- Coluna 1: Câmera e IA -->
+          <div class="cmd-col">
+            <!-- SEÇÃO DE TRANSMISSÃO -->
+            <div class="cmd-panel">
+              <div class="cmd-panel-title">
+                <span>📹 Transmissão de Vídeo</span>
+                <span class="cmd-badge" id="broadcast-status-label">OFFLINE</span>
+              </div>
+              
+              <video id="admin-cam-preview" autoplay playsinline muted style="width:100%;height:180px;border-radius:12px;object-fit:cover;display:none;margin-bottom:14px;background:#000;border:1px solid rgba(255,255,255,0.1);"></video>
+              <canvas id="admin-cam-canvas" style="display:none;"></canvas>
+
+              <button class="btn-primary cmd-btn-large" id="btn-toggle-broadcast" onclick="toggleCameraBroadcast()">
+                🎥 Iniciar Câmera do Smartphone/Webcam
+              </button>
+
+              <div style="margin-top:20px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:16px;">
+                <label class="form-label" style="color:#A78BFA;font-weight:700;">📡 Link Stream (IP Cam, YouTube, MP4)</label>
+                <input type="text" class="form-input" id="ctrl-camera-url" placeholder="http://ip-cam/video" style="margin-bottom:10px;">
+                <button class="btn-secondary" style="width:100%;color:var(--neon-emerald);border-color:var(--neon-emerald);" onclick="saveCameraUrl()">Ativar Link Stream</button>
+              </div>
+
+              <div style="margin-top:20px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:16px;">
+                <label class="form-label" style="color:var(--gold-accent);font-weight:700;">📁 Upload Vídeo MP4/WebM</label>
+                <div style="display:flex;gap:10px;">
+                  <input type="file" id="ctrl-video-file" accept="video/mp4,video/webm,video/ogg" class="form-input" style="padding:6px;">
+                  <button class="btn-secondary" style="white-space:nowrap;" onclick="uploadBetVideo()">📤 Enviar</button>
+                </div>
+                <div id="upload-progress-text" style="font-size:0.7rem;color:var(--text-gray);margin-top:6px;"></div>
+              </div>
+            </div>
+
+            <!-- IA de Visão -->
+            <div class="cmd-panel" style="border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.05);">
+              <div class="cmd-panel-title" style="color:var(--neon-emerald);">
+                <span>🤖 IA de Visão Computacional</span>
+                <span class="cmd-badge" id="ai-status-badge" style="background:rgba(239,68,68,0.2);color:#F87171;">DESATIVADO</span>
+              </div>
+              
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+                <select class="form-select" id="ctrl-ai-speed" onchange="if(typeof isAICounterRunning !== 'undefined' && isAICounterRunning) startAICounter();">
+                  <option value="precise" selected>🎯 Leitura Precisa</option>
+                  <option value="normal">🚗 Fluxo Normal</option>
+                  <option value="fast">🏎️ Avenida Rápida</option>
+                  <option value="peak">⚡ Horário Pico</option>
+                </select>
+                <button class="btn-primary" id="btn-toggle-ai-counter" style="background:linear-gradient(135deg,#10B981,#059669);" onclick="toggleAICounter()">
+                  ▶️ Ligar IA
+                </button>
+              </div>
+
+              <div style="font-size:0.75rem;font-weight:700;color:#A78BFA;margin-bottom:10px;">🎯 Ajuste da Linha de Leitura</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                  <label class="form-label" style="font-size:0.7rem;">Altura (Y): <strong id="lbl-line-y">52%</strong></label>
+                  <input type="range" id="ctrl-line-y" min="15" max="85" value="52" style="width:100%;accent-color:#10B981;" oninput="updateLinePositionPreview()">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:0.7rem;">Ângulo: <strong id="lbl-line-deg">0°</strong></label>
+                  <input type="range" id="ctrl-line-deg" min="-45" max="45" value="0" style="width:100%;accent-color:#10B981;" oninput="updateLinePositionPreview()">
+                </div>
+              </div>
+              <button class="btn-secondary" style="width:100%;margin-top:10px;" onclick="saveLineSettingsToSupabase()">💾 Salvar Posição da Linha</button>
+            </div>
+          </div>
+
+          <!-- Coluna 2: Contadores e Progressos -->
+          <div class="cmd-col">
+            <!-- DISPLAY GIGANTE -->
+            <div class="cmd-panel" style="text-align:center;padding:40px 20px;background:radial-gradient(circle at top, rgba(99,102,241,0.15) 0%, rgba(15,23,42,0) 70%);">
+              <div style="font-size:0.9rem;font-weight:800;letter-spacing:2px;color:#A78BFA;text-transform:uppercase;margin-bottom:10px;" id="ctrl-counter-subject">OBJETO</div>
+              <div style="font-size:6rem;font-weight:900;line-height:1;color:var(--text-white);text-shadow:0 0 30px rgba(99,102,241,0.5);" id="ctrl-live-count">0</div>
+              
+              <!-- PROGRESSO -->
+              <div style="margin-top:30px;max-width:400px;margin-left:auto;margin-right:auto;">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-gray);margin-bottom:8px;font-weight:700;">
+                  <span>Progresso</span>
+                  <span>Meta: <strong style="color:var(--gold-accent);" id="ctrl-target">0</strong></span>
+                </div>
+                <div style="height:12px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;">
+                  <div id="ctrl-progress-bar" style="height:100%;background:linear-gradient(90deg,#6366F1,#A855F7);width:0%;transition:width 0.4s ease;"></div>
+                </div>
+                <div style="text-align:right;font-size:0.75rem;color:var(--text-gray);margin-top:6px;" id="ctrl-progress-pct">0%</div>
+              </div>
+            </div>
+
+            <!-- CONTROLES MANUAIS -->
+            <div class="cmd-panel">
+              <div class="cmd-panel-title">🕹️ Controles Manuais Rápidos</div>
+              <div class="counter-btns-grid" style="grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:20px;">
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(1)">+1</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(5)">+5</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(10)">+10</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(50)">+50</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(100)">+100</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;" onclick="incrementCounter(500)">+500</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;background:rgba(239,68,68,0.15);color:#F87171;border-color:rgba(239,68,68,0.3);" onclick="decrementCounter(1)">-1</button>
+                <button class="counter-inc-btn" style="font-size:1.1rem;padding:12px;background:rgba(239,68,68,0.15);color:#F87171;border-color:rgba(239,68,68,0.3);" onclick="decrementCounter(10)">-10</button>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:flex-end;margin-top:auto;">
+                <div class="form-group" style="flex:1;min-width:200px;margin:0;display:flex;flex-direction:column;">
+                  <label class="form-label" style="margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ajustar valor absoluto exato</label>
+                  <input type="number" class="form-input" id="ctrl-manual-count" placeholder="Ex: 342" min="0" style="height:46px;min-height:46px;font-size:1rem;width:100%;">
+                </div>
+                <button class="btn-primary" style="height:46px;min-height:46px;padding:0 24px;flex:0 0 auto;width:auto;" onclick="setCounterManual()">Aplicar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

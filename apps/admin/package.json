@@ -1,0 +1,9 @@
+{
+  "name": "@palpitetotal/admin",
+  "version": "1.0.0",
+  "description": "Painel Web Administrativo & CRM Soberano PalpiteTotal",
+  "scripts": {
+    "dev": "npx -y lite-server -c bs-config.json --port=3001",
+    "dev:admin": "npx -y lite-server -c bs-config.json --port=3001"
+  }
+}
