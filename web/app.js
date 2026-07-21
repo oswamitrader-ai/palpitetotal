@@ -11,7 +11,7 @@ if (window.supabase && window.supabase.createClient) {
 }
 
 // ---- DATA STORE (localStorage + Supabase backed) ----
-const STORE_KEY = 'palpitetotal_data';
+const STORE_KEY = 'palpitetotal_data_v3';
 
 function getDefaultStore() {
   return {
@@ -19,11 +19,11 @@ function getDefaultStore() {
     userBets: [],
     transactions: [],
     profile: {
-      username: 'PalpiteiroMestre',
-      xp: 150,
+      username: '',
+      xp: 0,
       level: 1,
       referralCount: 0,
-      interests: 'Tempo,Esportes,Política'
+      interests: ''
     },
     posts: [],
     notifications: [],
@@ -124,16 +124,18 @@ async function syncFromSupabase() {
       }));
     }
 
-    const { data: dbProfiles } = await supabaseClient.from('profiles').select('*').eq('id', 'default_user');
-    if (dbProfiles && dbProfiles.length > 0) {
-      const p = dbProfiles[0];
-      store.profile = {
-        username: p.username,
-        xp: p.xp,
-        level: p.level,
-        referralCount: p.referral_count,
-        interests: p.interests
-      };
+    if (isLoggedIn && store.profile.username) {
+      const { data: dbProfiles } = await supabaseClient.from('profiles').select('*').eq('username', store.profile.username);
+      if (dbProfiles && dbProfiles.length > 0) {
+        const p = dbProfiles[0];
+        store.profile = {
+          username: p.username,
+          xp: p.xp,
+          level: p.level,
+          referralCount: p.referral_count,
+          interests: p.interests
+        };
+      }
     }
 
     saveStore(store);
