@@ -12,6 +12,7 @@ if (window.supabase && window.supabase.createClient) {
 
 // ---- AUTHENTICATION STATE ----
 let isLoggedIn = localStorage.getItem('palpitetotal_logged_in') === 'true';
+let loggedInUser = localStorage.getItem('palpitetotal_username') || '';
 
 // ---- DATA STORE (localStorage + Supabase backed) ----
 const STORE_KEY = 'palpitetotal_data_v2';
@@ -40,25 +41,16 @@ function getDefaultStore() {
 }
 
 function loadStore() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed) return parsed;
-    }
-  } catch (e) { /* ignore */ }
   return null;
 }
 
 function saveStore(store) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  // Store is now fully driven by Supabase. No localStorage.
 }
 
-let store = loadStore();
-
-if (!store) {
-  store = getDefaultStore();
-  saveStore(store);
+let store = loadStore() || getDefaultStore();
+if (loggedInUser) {
+  store.profile.username = loggedInUser;
 }
 
 // ---- PLATFORM SETTINGS FROM ADMIN ----
@@ -81,27 +73,34 @@ async function syncFromSupabase() {
       appSettings = stData;
     }
 
-    const { data: dbBets } = await supabaseClient.from('bets').select('*').order('id', { ascending: true });
+    const [betsRes, betOptionsRes, betHistoryRes, catRes] = await Promise.all([
+      supabaseClient.from('bets').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_options').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_history').select('*').order('created_at', { ascending: true }),
+      supabaseClient.from('categories').select('*').order('name', { ascending: true })
+    ]);
+
+    const dbBets = betsRes.data;
+    const dbBetOptions = betOptionsRes.data || [];
+    const dbBetHistory = betHistoryRes.data || [];
+    if (catRes.data) store.categories = catRes.data.map(c => c.name);
+
     if (dbBets && dbBets.length > 0) {
       store.bets = dbBets.map(b => {
-        const poolA = Number(b.pool_a) || 100;
-        const poolB = Number(b.pool_b) || 100;
-        const totalP = poolA + poolB;
+        const betOptions = dbBetOptions.filter(o => o.bet_id === b.id);
+        const betHistory = dbBetHistory.filter(h => h.bet_id === b.id);
+
         return {
           id: Number(b.id),
           title: b.title,
           description: b.description,
           category: b.category,
           creatorName: b.creator_name,
-          optionA: b.option_a,
-          optionB: b.option_b,
-          oddsA: totalP / poolA,
-          oddsB: totalP / poolB,
-          poolA: poolA,
-          poolB: poolB,
+          options: betOptions,
+          history: betHistory,
           status: b.status,
           isTrending: b.is_trending,
-          totalPool: Number(b.total_pool) > 0 ? Number(b.total_pool) : totalP,
+          totalPool: Number(b.total_pool) || 100,
           createdAt: new Date(b.created_at).getTime(),
         // Campos de Palpite de Contagem
         betType: b.bet_type || 'CLASSIC',
@@ -140,9 +139,9 @@ async function syncFromSupabase() {
     if (dbPortfolios && dbPortfolios.length > 0) {
       store.portfolios = dbPortfolios.map(p => ({
         id: Number(p.id),
-        betId: Number(p.bet_id),
-        sharesA: Number(p.shares_a),
-        sharesB: Number(p.shares_b)
+        bet_id: Number(p.bet_id),
+        option_label: p.option_label,
+        shares: Number(p.shares)
       }));
     } else {
       store.portfolios = [];
@@ -424,12 +423,15 @@ function initRealtimeSubscriptions() {
     });
 }
 
-// Inicializa realtime após o primeiro sync
-syncFromSupabase().then(() => {
+async function initApp() {
+  await syncFromSupabase();
   initRealtimeSubscriptions();
-}).catch(() => {
-  initRealtimeSubscriptions();
-});
+  switchTab('feed');
+  renderCurrentTab();
+}
+
+// Inicializa a aplicação
+initApp();
 
 function seedInitialData() {
   // Welcome bonus
@@ -610,7 +612,8 @@ function setQuickAmount(val) {
 let selectedCategory = 'Todos';
 
 function renderCategoryChips() {
-  const cats = ['Todos', '📹 Ao Vivo', 'Tempo', 'Política', 'Dia-a-dia', 'Esportes', 'Entretenimento'];
+  const dynamicCats = store.categories || ['Tempo', 'Política', 'Dia-a-dia', 'Esportes', 'Entretenimento'];
+  const cats = ['Todos', '📹 Ao Vivo', ...dynamicCats.filter(c => c !== '📹 Ao Vivo')];
   const container = document.getElementById('category-chips');
   container.innerHTML = cats.map(c =>
     `<button class="chip${selectedCategory === c ? ' active' : ''}" onclick="selectCategory('${c}')">${c}</button>`
@@ -694,19 +697,97 @@ function renderFeed() {
   } else {
     list.innerHTML = filteredClassic.map(b => renderBetCard(b, false)).join('');
   }
+  
+  // Renderiza os gráficos do Chart.js após inserir o HTML
+  renderAllCharts(filteredClassic);
+}
+
+function renderAllCharts(bets) {
+  // Evitar erro se Chart não estiver definido (ex: se o script não carregou)
+  if (typeof Chart === 'undefined') return;
+
+  bets.forEach(bet => {
+    const canvas = document.getElementById(`chart-${bet.id}`);
+    if (!canvas) return;
+
+    if (!bet.history || bet.history.length === 0) return; // Sem dados
+
+    const ctx = canvas.getContext('2d');
+    
+    // Agrupar histórico por option_label
+    const datasets = [];
+    const colors = ['#10B981', '#EF4444', '#FBBF24', '#3B82F6', '#A855F7'];
+    
+    if (bet.options) {
+      bet.options.forEach((opt, idx) => {
+        const hist = bet.history.filter(h => h.option_label === opt.option_label).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+        
+        if (hist.length > 0) {
+          // Se tiver apenas 1 ponto, duplica ele no passado para desenhar uma linha reta inicial
+          const plotData = hist.map(h => ({ x: new Date(h.created_at).getTime(), y: (100 / (h.odds || 1)) }));
+          if (plotData.length === 1) {
+             plotData.unshift({ x: plotData[0].x - 3600000, y: plotData[0].y }); // 1h atrás
+          }
+          
+          datasets.push({
+            label: opt.title,
+            data: plotData,
+            borderColor: colors[idx % colors.length],
+            borderWidth: 2,
+            tension: 0.4,
+            pointRadius: plotData.length === 1 ? 2 : 0
+          });
+        }
+      });
+    }
+
+    if (datasets.length > 0) {
+      new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { type: 'time', display: false },
+            y: { display: false, min: 0, max: 100 }
+          }
+        }
+      });
+    }
+  });
 }
 
 function renderBetCard(bet, isTrending) {
-  // Despacha para card especializado de contagem se for esse tipo
   if (bet.betType === 'COUNTER') return renderCounterBetCard(bet);
 
   const catClass = getCatClass(bet.category);
   
-  // Calcula probabilidades implícitas estilo Polymarket
-  const invA = 1 / bet.oddsA;
-  const invB = 1 / bet.oddsB;
-  const probA = Math.round((invA / (invA + invB)) * 100);
-  const probB = 100 - probA;
+  let buttonsHtml = '';
+  let probBarHtml = '';
+  
+  if (bet.options && bet.options.length > 0) {
+    const colors = ['buy-yes', 'buy-no', 'buy-opt3', 'buy-opt4', 'buy-opt5'];
+    buttonsHtml = bet.options.map((opt, i) => {
+      const prob = opt.current_odds > 0 ? Math.round(100 / opt.current_odds) : 0;
+      const c = colors[i % colors.length];
+      const extraStyle = i >= 2 ? 'background:rgba(255,255,255,0.05);color:var(--text-white);border:1px solid rgba(255,255,255,0.2);' : '';
+      return `
+        <button class="odds-btn ${c}" onclick="handleBetClick(${bet.id},'${opt.option_label}')" style="${extraStyle}">
+          <span class="odds-label">${opt.title}</span>
+          <span class="odds-value">${prob}%</span>
+        </button>
+      `;
+    }).join('');
+    
+    if (bet.options.length === 2) {
+       const pA = Math.round(100 / bet.options[0].current_odds);
+       probBarHtml = `<div class="market-bar-container"><div class="market-bar-fill" style="width: ${pA}%;"></div></div>`;
+    }
+  } else {
+    buttonsHtml = `<div style="color:var(--text-gray); font-size:0.8rem;">Opções indisponíveis</div>`;
+  }
 
   return `
     <div class="bet-card${isTrending ? ' trending' : ''}">
@@ -717,21 +798,26 @@ function renderBetCard(bet, isTrending) {
         </div>
       </div>
       <div class="bet-title">${bet.title}</div>
-      <div class="bet-desc">${bet.description}</div>
-      
-      <div class="market-bar-container">
-        <div class="market-bar-fill" style="width: ${probA}%;"></div>
+      ${bet.description.length > 80 ? `
+      <div id="desc-mob-${bet.id}" class="bet-desc" style="max-height: 40px; overflow: hidden; position: relative; transition: max-height 0.3s ease;">
+        ${bet.description}
       </div>
+      <button type="button" onclick="
+        const d = document.getElementById('desc-mob-${bet.id}');
+        if(d.style.maxHeight === '40px') { d.style.maxHeight = '1000px'; this.innerText = 'Ler menos'; }
+        else { d.style.maxHeight = '40px'; this.innerText = 'Ler mais'; }
+      " style="background:none;border:none;color:var(--gold-accent);font-size:0.75rem;padding:0;cursor:pointer;margin-bottom:8px;font-weight:600;">Ler mais</button>
+      ` : `<div class="bet-desc">${bet.description}</div>`}
       
-      <div class="bet-odds-row" style="margin-top:12px;">
-        <button class="odds-btn buy-yes" onclick="handleBetClick(${bet.id},'A')">
-          <span class="odds-label">${bet.optionA}</span>
-          <span class="odds-value">${probA}%</span>
-        </button>
-        <button class="odds-btn buy-no" onclick="handleBetClick(${bet.id},'B')">
-          <span class="odds-label">${bet.optionB}</span>
-          <span class="odds-value">${probB}%</span>
-        </button>
+      <!-- Volatility Chart -->
+      <div style="height: 60px; margin: 10px 0; width: 100%;">
+         <canvas id="chart-${bet.id}" class="volatility-chart"></canvas>
+      </div>
+
+      ${probBarHtml}
+      
+      <div class="bet-odds-row" style="margin-top:12px; flex-wrap:wrap;">
+        ${buttonsHtml}
       </div>
       
       <div class="bet-footer" style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
@@ -1056,15 +1142,18 @@ function setTradeMode(mode) {
 
 function openPlaceBet(bet, option) {
   placeBetTarget = { bet, option };
-  const optText = option === 'A' ? bet.optionA : bet.optionB;
-  const odds = option === 'A' ? bet.oddsA : bet.oddsB;
+  const betOpt = bet.options ? bet.options.find(o => o.option_label === option) : null;
+  const optText = betOpt ? betOpt.title : option;
   
-  const prob = option === 'A' ? (bet.poolA / bet.totalPool) * 100 : (bet.poolB / bet.totalPool) * 100;
-  const currentPrice = prob / 100;
+  const poolOpt = betOpt ? parseFloat(betOpt.pool) || 0 : 0;
+  const poolTot = parseFloat(bet.totalPool) || 0;
+  const prob = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : (1 / (bet.options ? bet.options.length : 2));
+  const probPerc = prob * 100;
+  const currentPrice = prob;
 
   document.getElementById('place-bet-title').textContent = bet.title;
   document.getElementById('place-bet-option').textContent = optText;
-  document.getElementById('place-bet-odds').textContent = `${Math.round(prob)}% (Preço Atual: ${currentPrice.toFixed(2)}¢)`;
+  document.getElementById('place-bet-odds').textContent = `${Math.round(probPerc)}% (Preço Atual: ${currentPrice.toFixed(2)}¢)`;
   document.getElementById('place-bet-balance').textContent = formatMoney(getBalance());
   document.getElementById('place-bet-amount').value = '';
   document.getElementById('place-bet-payout').textContent = '0 Cotas';
@@ -1091,10 +1180,10 @@ function updatePayout() {
   const bet = placeBetTarget.bet;
   const amount = parseFloat(document.getElementById('place-bet-amount').value) || 0;
   
-  const isA = placeBetTarget.option === 'A';
-  const newPool = (isA ? bet.poolA : bet.poolB) + amount;
-  const newTotal = bet.totalPool + amount;
-  const prob = (isA ? bet.poolA : bet.poolB) / bet.totalPool;
+  const betOpt = bet.options ? bet.options.find(o => o.option_label === placeBetTarget.option) : null;
+  const poolOpt = betOpt ? parseFloat(betOpt.pool) || 0 : 0;
+  const poolTot = parseFloat(bet.totalPool) || 0;
+  const prob = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : (1 / (bet.options ? bet.options.length : 2));
   
   if (tradeMode === 'BUY') {
     const shares = Math.floor(amount / prob);
@@ -1105,8 +1194,8 @@ function updatePayout() {
     document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(cash)}`;
   }
 
-  const pf = store.portfolios.find(p => p.betId === bet.id);
-  const ownedShares = pf ? (isA ? pf.sharesA : pf.sharesB) : 0;
+  const pf = store.portfolios.find(p => Number(p.bet_id) === Number(bet.id) && p.option_label === placeBetTarget.option);
+  const ownedShares = pf ? parseFloat(pf.shares || 0) : 0;
 
   const err = document.getElementById('place-bet-error');
   if (tradeMode === 'BUY' && amount > getBalance()) {
@@ -1128,11 +1217,13 @@ function confirmPlaceBet() {
     showSnackbar('Saldo insuficiente!');
     return;
   }
-  const isA = placeBetTarget.option === 'A';
-  const prob = (isA ? placeBetTarget.bet.poolA : placeBetTarget.bet.poolB) / placeBetTarget.bet.totalPool;
+  const betOpt = placeBetTarget.bet.options ? placeBetTarget.bet.options.find(o => o.option_label === placeBetTarget.option) : null;
+  const poolOpt = betOpt ? parseFloat(betOpt.pool) || 0 : 0;
+  const poolTot = parseFloat(placeBetTarget.bet.totalPool) || 0;
+  const prob = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : (1 / (placeBetTarget.bet.options ? placeBetTarget.bet.options.length : 2));
   
-  const pf = store.portfolios.find(p => p.betId === placeBetTarget.bet.id);
-  const ownedShares = pf ? (isA ? pf.sharesA : pf.sharesB) : 0;
+  const pf = store.portfolios.find(p => Number(p.bet_id) === Number(placeBetTarget.bet.id) && p.option_label === placeBetTarget.option);
+  const ownedShares = pf ? parseFloat(pf.shares || 0) : 0;
 
   let shares = 0;
   if (tradeMode === 'BUY') {
@@ -1149,9 +1240,9 @@ function confirmPlaceBet() {
   closeModal('modal-place-bet');
 }
 
-async function executePlaceBet(bet, option, amount, price, shares) {
-  const isA = option === 'A';
-  const optText = isA ? bet.optionA : bet.optionB;
+async function executePlaceBet(bet, optionLabel, amount, price, shares) {
+  const betOpt = bet.options ? bet.options.find(o => o.option_label === optionLabel) : null;
+  const optText = betOpt ? betOpt.title : optionLabel;
   
   if (tradeMode === 'BUY') {
     showSnackbar(`Ordem de Compra enviada! ${shares} Cotas ao Livro.`);
@@ -1159,10 +1250,13 @@ async function executePlaceBet(bet, option, amount, price, shares) {
     showSnackbar(`Ordem de Venda enviada! Tentando liquidar ${shares} Cotas...`);
   }
 
-  if (tradeMode === 'BUY') {
-    if (isA) bet.poolA += amount;
-    else bet.poolB += amount;
+  if (tradeMode === 'BUY' && betOpt) {
+    betOpt.pool += amount;
     bet.totalPool += amount;
+    // Recalcula odds para todas as opções
+    bet.options.forEach(o => {
+      o.current_odds = bet.totalPool / (o.pool || 1);
+    });
   }
 
   if (supabaseClient) {
@@ -1171,7 +1265,7 @@ async function executePlaceBet(bet, option, amount, price, shares) {
       const { data: orderId, error } = await supabaseClient.rpc('place_limit_order', {
         p_bet_id: bet.id,
         p_user_id: store.profile.username,
-        p_option: option,
+        p_option: optionLabel,
         p_order_type: tradeMode,
         p_price: price,
         p_shares: shares
@@ -1189,11 +1283,14 @@ async function executePlaceBet(bet, option, amount, price, shares) {
         });
 
         // Atualiza a barra de volume e as odds do evento para os próximos compradores! (AMM Shift)
-        supabaseClient.from('bets').update({
-          pool_a: bet.poolA,
-          pool_b: bet.poolB,
-          total_pool: bet.totalPool
-        }).eq('id', bet.id).then();
+        supabaseClient.from('bets').update({ total_pool: bet.totalPool }).eq('id', bet.id).then();
+        
+        if (bet.options) {
+          for (const o of bet.options) {
+             supabaseClient.from('bet_options').update({ pool: o.pool, current_odds: o.current_odds }).eq('id', o.id).then();
+             supabaseClient.from('bet_history').insert({ bet_id: bet.id, option_label: o.option_label, odds: o.current_odds }).then();
+          }
+        }
       }
       
     } catch (err) {
@@ -1219,7 +1316,7 @@ async function executePlaceBet(bet, option, amount, price, shares) {
     id: store.nextUserBetId++,
     betId: bet.id,
     betTitle: bet.title,
-    chosenOption: option,
+    chosenOption: optionLabel,
     chosenOptionText: optText,
     amount,
     odds: newOdds,
@@ -2130,7 +2227,11 @@ async function confirmLogin() {
   store.profile.username = authenticatedUsername;
   isLoggedIn = true;
   localStorage.setItem('palpitetotal_logged_in', 'true');
+  localStorage.setItem('palpitetotal_username', authenticatedUsername);
+  loggedInUser = authenticatedUsername;
   saveStore(store);
+
+  await syncFromSupabase();
 
   closeModal('modal-auth');
   showSnackbar(`✨ Bem-vindo de volta, ${authenticatedUsername}!`);
@@ -2207,7 +2308,12 @@ async function confirmRegister() {
 
   isLoggedIn = true;
   localStorage.setItem('palpitetotal_logged_in', 'true');
+  localStorage.setItem('palpitetotal_username', username);
+  loggedInUser = username;
   saveStore(store);
+  
+  await syncFromSupabase();
+
   closeModal('modal-auth');
   showSnackbar(`🎉 Conta criada! R$ 1.000,00 de Bônus adicionados!`);
   renderCurrentTab();
@@ -2222,7 +2328,9 @@ async function confirmLogout() {
 
   localStorage.removeItem(STORE_KEY);
   localStorage.removeItem('palpitetotal_logged_in');
+  localStorage.removeItem('palpitetotal_username');
   isLoggedIn = false;
+  loggedInUser = '';
   store = getDefaultStore();
   saveStore(store);
 

@@ -378,39 +378,27 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Categoria</label>
+        <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+          Categoria
+          <button type="button" class="btn-secondary" style="padding:2px 8px; font-size:0.7rem; width:auto; border-radius:4px;" onclick="promptNewCategory()">+ Nova</button>
+        </label>
         <select class="form-select" id="adm-create-category">
-          <option value="Tempo">Tempo</option>
-          <option value="Política">Política</option>
-          <option value="Esportes">Esportes</option>
-          <option value="Dia-a-dia" selected>Dia-a-dia</option>
-          <option value="Entretenimento">Entretenimento</option>
-          <option value="Contagem">Contagem Ao Vivo 📹</option>
+          <!-- As categorias serão populadas dinamicamente pelo app -->
         </select>
       </div>
 
       <!-- CAMPOS CLÁSSICOS -->
       <div id="classic-fields">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label class="form-label">Opção A</label>
-            <input type="text" class="form-input" id="adm-create-optA" value="Sim">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Opção B</label>
-            <input type="text" class="form-input" id="adm-create-optB" value="Não">
-          </div>
+      <!-- OPÇÕES DINÂMICAS -->
+      <div id="adm-create-options-container" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:14px;border-radius:12px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:0.7rem;font-weight:800;color:var(--text-white);letter-spacing:1px;text-transform:uppercase;">📊 Opções de Resultado</div>
+          <button type="button" class="btn-secondary" style="padding:4px 8px;font-size:0.7rem;width:auto;" onclick="addCreateOption()">+ Adicionar Opção</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group">
-            <label class="form-label">Probabilidade Inicial (%)</label>
-            <input type="number" class="form-input" id="adm-create-probA" value="50" step="1" min="1" max="99" oninput="document.getElementById('adm-create-probB').value = 100 - this.value">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Probabilidade B (%)</label>
-            <input type="number" class="form-input" id="adm-create-probB" value="50" step="1" min="1" max="99" oninput="document.getElementById('adm-create-probA').value = 100 - this.value">
-          </div>
+        <div id="adm-create-options-list" style="display:flex;flex-direction:column;gap:10px;">
+          <!-- As opções dinâmicas aparecerão aqui -->
         </div>
+      </div>
       </div>
 
       <!-- CAMPOS DE CONTAGEM -->
@@ -508,26 +496,20 @@
         </select>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Opção A</label>
-          <input type="text" class="form-input" id="adm-edit-optA">
+      <div style="margin-top:16px;">
+        <label class="form-label" style="display:flex; justify-content:space-between;">
+          <span>Opções da Aposta (Respostas)</span>
+          <span style="font-size:0.7rem; color:var(--text-gray); font-weight:normal;">Múltiplas opções suportadas</span>
+        </label>
+        
+        <div id="edit-dynamic-options-container">
+          <!-- Renderizadas dinamicamente via JS -->
         </div>
-        <div class="form-group">
-          <label class="form-label">Opção B</label>
-          <input type="text" class="form-input" id="adm-edit-optB">
-        </div>
-      </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Probabilidade A (%)</label>
-          <input type="number" class="form-input" id="adm-edit-probA" step="1" min="1" max="99" oninput="document.getElementById('adm-edit-probB').value = 100 - this.value">
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="color:var(--neon-emerald);font-weight:700;">⚡ Probabilidade B (%)</label>
-          <input type="number" class="form-input" id="adm-edit-probB" step="1" min="1" max="99" oninput="document.getElementById('adm-edit-probA').value = 100 - this.value">
-        </div>
+        <button type="button" class="btn-secondary" style="width:100%; margin-top:10px; font-size:0.8rem;" onclick="addEditOption()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle;"><path d="M12 5v14m-7-7h14"/></svg>
+          Adicionar Nova Opção
+        </button>
       </div>
 
       <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">

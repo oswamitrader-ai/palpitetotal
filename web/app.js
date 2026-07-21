@@ -10,6 +10,9 @@ if (window.supabase && window.supabase.createClient) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+let isLoggedIn = localStorage.getItem('palpitetotal_logged_in') === 'true';
+let loggedInUser = localStorage.getItem('palpitetotal_username') || '';
+
 // ---- DATA STORE (localStorage + Supabase backed) ----
 const STORE_KEY = 'palpitetotal_data_v3';
 
@@ -36,78 +39,101 @@ function getDefaultStore() {
 }
 
 function loadStore() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) { /* ignore */ }
   return null;
 }
 
 function saveStore(store) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  // O estado agora vive puramente na memória (Supabase source of truth).
+  // localStorage não será mais atualizado com o store inteiro.
 }
 
-let store = loadStore();
-
-if (!store) {
-  store = getDefaultStore();
-  seedInitialData();
-  seedInitialPosts();
-  saveStore(store);
+let store = loadStore() || getDefaultStore();
+if (loggedInUser) {
+  store.profile.username = loggedInUser;
 }
 
 // ---- SUPABASE SYNC FUNCTION ----
 async function syncFromSupabase() {
   if (!supabaseClient) return;
   try {
-    const { data: dbBets } = await supabaseClient.from('bets').select('*').order('id', { ascending: true });
+    const [betsRes, betOptionsRes, betHistoryRes, catRes] = await Promise.all([
+      supabaseClient.from('bets').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_options').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_history').select('*').order('created_at', { ascending: true }),
+      supabaseClient.from('categories').select('*').order('name', { ascending: true })
+    ]);
+
+    const dbBets = betsRes.data;
+    const dbBetOptions = betOptionsRes.data || [];
+    const dbBetHistory = betHistoryRes.data || [];
+    if (catRes.data) store.categories = catRes.data.map(c => c.name);
+
     if (dbBets && dbBets.length > 0) {
-      store.bets = dbBets.map(b => ({
-        id: Number(b.id),
-        title: b.title,
-        description: b.description,
-        category: b.category,
-        creatorName: b.creator_name,
-        optionA: b.option_a,
-        optionB: b.option_b,
-        oddsA: Number(b.odds_a),
-        oddsB: Number(b.odds_b),
-        status: b.status,
-        isTrending: b.is_trending,
-        totalPool: Number(b.total_pool),
-        createdAt: new Date(b.created_at).getTime()
-      }));
+      store.bets = dbBets.map(b => {
+        const betOptions = dbBetOptions.filter(o => o.bet_id === b.id);
+        const betHistory = dbBetHistory.filter(h => h.bet_id === b.id);
+
+        return {
+          id: Number(b.id),
+          title: b.title,
+          description: b.description,
+          category: b.category,
+          creatorName: b.creator_name,
+          options: betOptions,
+          history: betHistory,
+          status: b.status,
+          isTrending: b.is_trending,
+          totalPool: Number(b.total_pool) || 100,
+          createdAt: new Date(b.created_at).getTime(),
+          betType: b.bet_type || 'CLASSIC',
+          countTarget: Number(b.count_target || 0),
+          countSubject: b.count_subject || 'pessoas',
+          countLocation: b.count_location || '',
+          liveCount: Number(b.live_count || 0),
+          countMin: Number(b.count_min || 0),
+          countMax: Number(b.count_max || 0),
+          cameraLabel: b.camera_label || '',
+          cameraUrl: b.camera_url || '',
+          expiresAt: b.expires_at ? new Date(b.expires_at).getTime() : null
+        };
+      });
     }
 
-    const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').order('id', { ascending: true });
-    if (dbUserBets && dbUserBets.length > 0) {
-      store.userBets = dbUserBets.map(ub => ({
-        id: Number(ub.id),
-        betId: Number(ub.bet_id),
-        betTitle: ub.bet_title,
-        chosenOption: ub.chosen_option,
-        chosenOptionText: ub.chosen_option_text,
-        amount: Number(ub.amount),
-        odds: Number(ub.odds),
-        potentialWin: Number(ub.potential_win),
-        status: ub.status,
-        createdAt: new Date(ub.created_at).getTime()
-      }));
+    // Fetch user_bets and transactions for the logged in user ONLY
+    if (isLoggedIn && store.profile.username) {
+      const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+      if (dbUserBets && dbUserBets.length > 0) {
+        store.userBets = dbUserBets.map(ub => ({
+          id: Number(ub.id),
+          betId: Number(ub.bet_id),
+          betTitle: ub.bet_title,
+          chosenOption: ub.chosen_option,
+          chosenOptionText: ub.chosen_option_text,
+          amount: Number(ub.amount),
+          odds: Number(ub.odds),
+          potentialWin: Number(ub.potential_win),
+          status: ub.status,
+          createdAt: new Date(ub.created_at).getTime()
+        }));
+      } else {
+        store.userBets = [];
+      }
+
+      const { data: dbTx } = await supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+      if (dbTx && dbTx.length > 0) {
+        store.transactions = dbTx.map(t => ({
+          id: Number(t.id),
+          amount: Number(t.amount),
+          description: t.description,
+          type: t.type,
+          status: t.status || 'COMPLETED',
+          timestamp: new Date(t.timestamp).getTime()
+        }));
+      } else {
+        store.transactions = [];
+      }
     } else {
       store.userBets = [];
-    }
-
-    const { data: dbTx } = await supabaseClient.from('transactions').select('*').order('id', { ascending: true });
-    if (dbTx && dbTx.length > 0) {
-      store.transactions = dbTx.map(t => ({
-        id: Number(t.id),
-        amount: Number(t.amount),
-        description: t.description,
-        type: t.type,
-        status: t.status || 'COMPLETED',
-        timestamp: new Date(t.timestamp).getTime()
-      }));
-    } else {
       store.transactions = [];
     }
 
@@ -133,6 +159,17 @@ async function syncFromSupabase() {
 
     if (isLoggedIn && store.profile.username) {
       const { data: dbProfiles } = await supabaseClient.from('profiles').select('*').eq('username', store.profile.username);
+      const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+      if (dbPortfolios && dbPortfolios.length > 0) {
+        store.portfolios = dbPortfolios.map(p => ({
+          id: Number(p.id),
+          bet_id: Number(p.bet_id),
+          option_label: p.option_label,
+          shares: Number(p.shares)
+        }));
+      } else {
+        store.portfolios = [];
+      }
       if (dbProfiles && dbProfiles.length > 0) {
         const p = dbProfiles[0];
         store.profile = {
@@ -320,7 +357,8 @@ function setQuickAmount(val) {
 let selectedCategory = 'Todos';
 
 function renderCategoryChips() {
-  const cats = ['Todos', 'Tempo', 'Política', 'Dia-a-dia', 'Esportes', 'Entretenimento'];
+  const dynamicCats = store.categories || ['Tempo', 'Política', 'Dia-a-dia', 'Esportes', 'Entretenimento'];
+  const cats = ['Todos', '📹 Ao Vivo', ...dynamicCats.filter(c => c !== '📹 Ao Vivo')];
   const container = document.getElementById('category-chips');
   container.innerHTML = cats.map(c =>
     `<button class="chip${selectedCategory === c ? ' active' : ''}" onclick="selectCategory('${c}')">${c}</button>`
@@ -372,10 +410,79 @@ function renderFeed() {
   } else {
     list.innerHTML = filtered.map(b => renderBetCard(b, false)).join('');
   }
+
+  // Renderiza gráficos do Chart.js
+  renderAllCharts(filtered);
+}
+
+function renderAllCharts(bets) {
+  if (typeof Chart === 'undefined') return;
+
+  bets.forEach(bet => {
+    const canvas = document.getElementById(`chart-${bet.id}`);
+    if (!canvas) return;
+    if (!bet.history || bet.history.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    const datasets = [];
+    const colors = ['#10B981', '#EF4444', '#FBBF24', '#3B82F6', '#A855F7'];
+    
+    if (bet.options) {
+      bet.options.forEach((opt, idx) => {
+        const hist = bet.history.filter(h => h.option_label === opt.option_label).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+        
+        if (hist.length > 0) {
+          // Se tiver apenas 1 ponto, duplica ele no passado para desenhar uma linha reta inicial
+          const plotData = hist.map(h => ({ x: new Date(h.created_at).getTime(), y: (100 / (h.odds || 1)) }));
+          if (plotData.length === 1) {
+             plotData.unshift({ x: plotData[0].x - 3600000, y: plotData[0].y }); // 1h atrás
+          }
+          
+          datasets.push({
+            label: opt.title,
+            data: plotData,
+            borderColor: colors[idx % colors.length],
+            borderWidth: 2,
+            tension: 0.4,
+            pointRadius: plotData.length === 1 ? 2 : 0
+          });
+        }
+      });
+    }
+
+    if (datasets.length > 0) {
+      new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { type: 'time', display: false },
+            y: { display: false, min: 0, max: 100 }
+          }
+        }
+      });
+    }
+  });
 }
 
 function renderBetCard(bet, isTrending) {
   const catClass = getCatClass(bet.category);
+  
+  let buttonsHtml = '';
+  if (bet.options && bet.options.length > 0) {
+    buttonsHtml = bet.options.map(opt => `
+      <button class="odds-btn" onclick="handleBetClick(${bet.id},'${opt.option_label}')" style="flex:1;">
+        <span class="odds-label">${opt.title}</span>
+        <span class="odds-value">${opt.current_odds > 0 ? (100 / opt.current_odds).toFixed(0) : 0}%</span>
+      </button>
+    `).join('');
+  } else {
+    buttonsHtml = `<div style="color:var(--text-gray); font-size:0.8rem;">Opções indisponíveis</div>`;
+  }
+
   return `
     <div class="bet-card${isTrending ? ' trending' : ''}">
       <div class="bet-header">
@@ -386,16 +493,24 @@ function renderBetCard(bet, isTrending) {
         <span class="pool-text">Pool: R$ ${Math.round(bet.totalPool).toLocaleString('pt-BR')}</span>
       </div>
       <div class="bet-title">${bet.title}</div>
-      <div class="bet-desc">${bet.description}</div>
-      <div class="bet-odds-row">
-        <button class="odds-btn" onclick="handleBetClick(${bet.id},'A')">
-          <span class="odds-label">${bet.optionA}</span>
-          <span class="odds-value">${bet.oddsA.toFixed(2)}</span>
-        </button>
-        <button class="odds-btn" onclick="handleBetClick(${bet.id},'B')">
-          <span class="odds-label">${bet.optionB}</span>
-          <span class="odds-value">${bet.oddsB.toFixed(2)}</span>
-        </button>
+      ${bet.description.length > 80 ? `
+      <div id="desc-web-${bet.id}" class="bet-desc" style="max-height: 40px; overflow: hidden; position: relative; transition: max-height 0.3s ease;">
+        ${bet.description}
+      </div>
+      <button type="button" onclick="
+        const d = document.getElementById('desc-web-${bet.id}');
+        if(d.style.maxHeight === '40px') { d.style.maxHeight = '1000px'; this.innerText = 'Ler menos'; }
+        else { d.style.maxHeight = '40px'; this.innerText = 'Ler mais'; }
+      " style="background:none;border:none;color:var(--gold-accent);font-size:0.75rem;padding:0;cursor:pointer;margin-bottom:8px;font-weight:600;">Ler mais</button>
+      ` : `<div class="bet-desc">${bet.description}</div>`}
+      
+      <!-- Volatility Chart -->
+      <div style="height: 60px; margin: 10px 0; width: 100%;">
+         <canvas id="chart-${bet.id}" class="volatility-chart"></canvas>
+      </div>
+
+      <div class="bet-odds-row" style="flex-wrap:wrap;">
+        ${buttonsHtml}
       </div>
       <div class="bet-footer"><span class="creator-text">Criado por: ${bet.creatorName}</span></div>
     </div>
@@ -423,10 +538,12 @@ function handleBetClick(betId, option) {
   }
 }
 
-function openPlaceBet(bet, option) {
-  placeBetTarget = { bet, option };
-  const optText = option === 'A' ? bet.optionA : bet.optionB;
-  const odds = option === 'A' ? bet.oddsA : bet.oddsB;
+function openPlaceBet(bet, optionLabel) {
+  placeBetTarget = { bet, option: optionLabel };
+  const betOpt = bet.options ? bet.options.find(o => o.option_label === optionLabel) : null;
+  const optText = betOpt ? betOpt.title : optionLabel;
+  const odds = betOpt ? betOpt.current_odds : 1.90;
+  
   document.getElementById('place-bet-title').textContent = bet.title;
   document.getElementById('place-bet-option').textContent = 'Escolha: ' + optText;
   document.getElementById('place-bet-odds').textContent = '@' + odds.toFixed(2);
@@ -449,7 +566,8 @@ function setPlaceBetAmountAllIn() {
 
 function updatePayout() {
   if (!placeBetTarget) return;
-  const odds = placeBetTarget.option === 'A' ? placeBetTarget.bet.oddsA : placeBetTarget.bet.oddsB;
+  const betOpt = placeBetTarget.bet.options ? placeBetTarget.bet.options.find(o => o.option_label === placeBetTarget.option) : null;
+  const odds = betOpt ? betOpt.current_odds : 1.90;
   const amount = parseFloat(document.getElementById('place-bet-amount').value) || 0;
   document.getElementById('place-bet-payout').textContent = formatMoney(amount * odds);
 
@@ -475,9 +593,10 @@ function confirmPlaceBet() {
   showSnackbar(`Palpite de R$ ${amount.toFixed(2)} confirmado!`);
 }
 
-function executePlaceBet(bet, option, amount) {
-  const optText = option === 'A' ? bet.optionA : bet.optionB;
-  const odds = option === 'A' ? bet.oddsA : bet.oddsB;
+async function executePlaceBet(bet, optionLabel, amount) {
+  const betOpt = bet.options ? bet.options.find(o => o.option_label === optionLabel) : null;
+  const optText = betOpt ? betOpt.title : optionLabel;
+  const odds = betOpt ? betOpt.current_odds : 1.90;
   const potentialWin = amount * odds;
 
   // Debit
@@ -490,12 +609,31 @@ function executePlaceBet(bet, option, amount) {
   // User bet
   store.userBets.push({
     id: store.nextUserBetId++, betId: bet.id, betTitle: bet.title,
-    chosenOption: option, chosenOptionText: optText,
+    chosenOption: optionLabel, chosenOptionText: optText,
     amount, odds, potentialWin, status: 'PENDING', createdAt: Date.now()
   });
 
-  // Update pool
-  bet.totalPool += amount;
+  // Atualizar AMM Localmente e Persistir
+  if (betOpt) {
+    betOpt.pool += amount;
+    bet.totalPool += amount;
+    bet.options.forEach(o => {
+      o.current_odds = bet.totalPool / (o.pool || 1);
+    });
+
+    if (supabaseClient) {
+       // A versão WEB é apenas leitura e push na UserBets. Na Web os palpites também usam place_limit_order?
+       // A versão Web parece não ter limit_order na sua executePlaceBet. Ela grava em user_bets com PENDING.
+       // Isso faz sentido, na web o usuário cria uma 'Solicitação' que vai pro Admin.
+       await supabaseClient.from('user_bets').insert({
+          bet_id: bet.id, bet_title: bet.title,
+          chosen_option: optionLabel, chosen_option_text: optText,
+          amount: amount, odds: odds, potential_win: potentialWin,
+          status: 'PENDING', username: store.profile.username
+       });
+       // O ADMIN é quem resolve. Mas já salvamos na base.
+    }
+  }
 
   addXp(50);
   saveStore(store);
@@ -958,6 +1096,10 @@ function toggleInterest(interest) {
     selected.push(interest);
   }
   store.profile.interests = selected.join(',');
+  isLoggedIn = true;
+  localStorage.setItem('palpitetotal_logged_in', 'true');
+  localStorage.setItem('palpitetotal_username', store.profile.username);
+  loggedInUser = store.profile.username;
   saveStore(store);
   showSnackbar('Áreas de interesse atualizadas!');
   openProfile(); // Re-render
@@ -1089,20 +1231,28 @@ async function confirmLogin() {
     return;
   }
 
+  let authenticatedUsername = email.split('@')[0];
+
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) {
-        store.profile.username = email.split('@')[0] || store.profile.username;
+        authenticatedUsername = email.split('@')[0] || store.profile.username;
       } else if (data.user) {
-        store.profile.username = data.user.email.split('@')[0];
+        authenticatedUsername = data.user.email.split('@')[0];
       }
     } catch (e) {
-      store.profile.username = email.split('@')[0];
+      authenticatedUsername = email.split('@')[0];
     }
-  } else {
-    store.profile.username = email.split('@')[0];
   }
+
+  store.profile.username = authenticatedUsername;
+  isLoggedIn = true;
+  localStorage.setItem('palpitetotal_logged_in', 'true');
+  localStorage.setItem('palpitetotal_username', authenticatedUsername);
+  loggedInUser = authenticatedUsername;
+
+  await syncFromSupabase();
 
   saveStore(store);
   closeModal('modal-auth');
@@ -1153,7 +1303,14 @@ async function confirmRegister() {
     } catch (e) { /* fallback */ }
   }
 
+  isLoggedIn = true;
+  localStorage.setItem('palpitetotal_logged_in', 'true');
+  localStorage.setItem('palpitetotal_username', username);
+  loggedInUser = username;
   saveStore(store);
+
+  await syncFromSupabase();
+
   closeModal('modal-auth');
   showSnackbar(`Conta criada com sucesso! R$ 1.000,00 de Bônus adicionados!`);
   renderCurrentTab();
@@ -1268,16 +1425,32 @@ function renderAdminCharts() {
   }
 }
 
-function renderCRMUsersTable() {
+async function renderCRMUsersTable() {
   const container = document.getElementById('crm-user-table');
   if (!container) return;
 
-  const users = [
-    { username: store.profile.username, level: store.profile.level, balance: getBalance(), role: 'Você (Soberano)', status: 'Ativo' },
-    { username: 'VidenteDasOdds', level: 4, balance: 3450.00, role: 'Apostador Pro', status: 'Ativo' },
-    { username: 'DebatedorProfissional', level: 3, balance: 1280.00, role: 'Apostador', status: 'Ativo' },
-    { username: 'VerdaoDeCoracao', level: 5, balance: 5900.00, role: 'VIP', status: 'Ativo' }
-  ];
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-gray);">Carregando usuários...</div>';
+
+  let users = [];
+  try {
+    if (supabaseClient) {
+      const { data: dbProfiles } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
+      if (dbProfiles) {
+        users = dbProfiles.map(p => ({
+          username: p.username,
+          level: p.level || 1,
+          balance: p.balance !== undefined && p.balance !== null ? Number(p.balance) : 0,
+          role: p.role || 'Apostador',
+          status: p.status || 'Ativo'
+        }));
+      }
+    }
+  } catch (e) {}
+
+  if (users.length === 0) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-gray);">Nenhum usuário encontrado no banco.</div>';
+    return;
+  }
 
   container.innerHTML = `
     <div class="crm-table-container">
@@ -1309,20 +1482,26 @@ function renderCRMUsersTable() {
   `;
 }
 
-function giveBonusUser(username) {
-  if (username === store.profile.username) {
-    store.transactions.push({
-      id: store.nextTxId++,
+async function giveBonusUser(username) {
+  if (!supabaseClient) return;
+  try {
+    await supabaseClient.from('transactions').insert({
       amount: 100,
       description: 'Bônus Administrativo CRM',
-      type: 'DEPOSIT',
-      timestamp: Date.now()
+      type: 'ADMIN_BONUS',
+      username: username,
+      status: 'COMPLETED'
     });
-    saveStore(store);
-    showSnackbar('Bônus de R$ 100,00 creditado com sucesso!');
-    renderCurrentTab();
-  } else {
-    showSnackbar(`Bônus de R$ 100,00 concedido a ${username}!`);
+    
+    const { data: prof } = await supabaseClient.from('profiles').select('balance').eq('username', username).single();
+    if (prof) {
+       await supabaseClient.from('profiles').update({ balance: Number(prof.balance) + 100 }).eq('username', username);
+    }
+    
+    showSnackbar(`Bônus de R$ 100,00 concedido a ${username} com sucesso!`);
+    renderCRMUsersTable(); // Recarrega a tabela de usuários
+  } catch (err) {
+    showSnackbar('Erro ao conceder bônus no Supabase');
   }
 }
 

@@ -74,13 +74,16 @@ async function loadAdminData() {
   }
 
   try {
-    const [betsRes, userBetsRes, txRes, profilesRes, postsRes, settingsRes] = await Promise.all([
+    const [betsRes, betOptionsRes, betHistoryRes, userBetsRes, txRes, profilesRes, postsRes, settingsRes, catRes] = await Promise.all([
       supabaseClient.from('bets').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_options').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_history').select('*').order('created_at', { ascending: true }),
       supabaseClient.from('user_bets').select('*').order('id', { ascending: true }),
       supabaseClient.from('transactions').select('*').order('id', { ascending: false }),
       supabaseClient.from('profiles').select('*').order('created_at', { ascending: false }),
       supabaseClient.from('posts').select('*').order('id', { ascending: false }),
-      supabaseClient.from('platform_settings').select('*').eq('id', 'default').single()
+      supabaseClient.from('platform_settings').select('*').eq('id', 'default').single(),
+      supabaseClient.from('categories').select('*').order('name', { ascending: true })
     ]);
 
     // Trata erros silenciosos retornados pelo SDK
@@ -94,7 +97,18 @@ async function loadAdminData() {
     if (postsRes.error) console.error('Erro posts:', postsRes.error);
     if (settingsRes.error) console.error('Erro settings:', settingsRes.error);
 
-    if (betsRes.data) adminStore.bets = betsRes.data;
+    if (betsRes.data) {
+      adminStore.bets = betsRes.data;
+      if (betOptionsRes.data) adminStore.betOptions = betOptionsRes.data;
+      if (betHistoryRes.data) adminStore.betHistory = betHistoryRes.data;
+      
+      // Associar as opções dinâmicas diretamente nas apostas
+      adminStore.bets.forEach(b => {
+        b.options = adminStore.betOptions ? adminStore.betOptions.filter(o => o.bet_id === b.id) : [];
+        b.history = adminStore.betHistory ? adminStore.betHistory.filter(h => h.bet_id === b.id) : [];
+      });
+    }
+    
     if (userBetsRes.data) adminStore.userBets = userBetsRes.data;
     if (txRes.data) adminStore.transactions = txRes.data;
     
@@ -107,6 +121,10 @@ async function loadAdminData() {
 
     if (postsRes.data) adminStore.posts = postsRes.data;
     if (settingsRes.data) platformSettings = settingsRes.data;
+    if (catRes && catRes.data) {
+      adminStore.categories = catRes.data;
+      renderAdminCategories();
+    }
 
     renderAdminCurrentTab();
     startExpirationChecker();
@@ -214,6 +232,45 @@ function switchAdminTab(tab) {
   document.getElementById('admin-tab-' + tab).classList.add('active');
 
   renderAdminCurrentTab();
+}
+
+// ---- CATEGORIAS DINÂMICAS ----
+function renderAdminCategories() {
+  const select = document.getElementById('adm-create-category');
+  if (!select) return;
+  const cats = adminStore.categories || [];
+  select.innerHTML = cats.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+async function promptNewCategory() {
+  const newCat = prompt("Digite o nome da nova categoria:");
+  if (!newCat || newCat.trim() === '') return;
+  const catName = newCat.trim();
+  
+  try {
+    const { data, error } = await supabaseClient.from('categories').insert({ name: catName }).select('*').single();
+    if (error) {
+       if (error.code === '23505') { // unique violation
+          showSnackbar('Esta categoria já existe.');
+       } else {
+          showSnackbar(`Erro: ${error.message}`);
+       }
+       return;
+    }
+    if (data) {
+       adminStore.categories = adminStore.categories || [];
+       adminStore.categories.push(data);
+       adminStore.categories.sort((a,b) => a.name.localeCompare(b.name));
+       renderAdminCategories();
+       showSnackbar(`Categoria '${catName}' adicionada!`);
+       // Força selecionar a nova categoria
+       const select = document.getElementById('adm-create-category');
+       if (select) select.value = catName;
+    }
+  } catch(err) {
+    console.error(err);
+    showSnackbar('Erro ao criar categoria.');
+  }
 }
 
 function renderAdminCurrentTab() {
@@ -486,8 +543,9 @@ function renderAdminSoberanoView() {
             ${isCounter ? 'Liquidar contador — Escolha a opção vencedora:' : 'Escolha a opção vencedora para liquidar:'}
           </div>
           <div class="bet-odds-row">
-            <button class="resolve-btn" onclick="resolveBetAdmin(${b.id}, 'A')">${b.option_a} (@${Number(b.odds_a).toFixed(2)})</button>
-            <button class="resolve-btn" onclick="resolveBetAdmin(${b.id}, 'B')">${b.option_b} (@${Number(b.odds_b).toFixed(2)})</button>
+            ${b.options && b.options.length > 0 ? b.options.map(opt => `
+              <button class="resolve-btn" onclick="resolveBetAdmin(${b.id}, '${opt.option_label}')">${opt.title} (@${Number(opt.current_odds || 0).toFixed(2)})</button>
+            `).join('') : '<div style="color:var(--text-gray);font-size:0.8rem;">Opções não carregadas</div>'}
           </div>
         </div>
       `;
@@ -637,11 +695,11 @@ async function resolveBetAdmin(betId, winningOption) {
   const bet = adminStore.bets.find(b => Number(b.id) === Number(betId));
   if (!bet) return;
 
-  const newStatus = winningOption === 'A' ? 'RESOLVED_A' : 'RESOLVED_B';
+  const newStatus = 'RESOLVED_' + winningOption;
 
   try {
     // 1. Atualiza status da bet para CLOSED primeiro para disparar realtime
-    //    depois atualiza para RESOLVED_A/B para preservar o vencedor
+    //    depois atualiza para RESOLVED_* para preservar o vencedor
     await supabaseClient.from('bets').update({ status: 'CLOSED' }).eq('id', betId);
     await supabaseClient.from('bets').update({ status: newStatus }).eq('id', betId);
 
@@ -657,7 +715,8 @@ async function resolveBetAdmin(betId, winningOption) {
     const toProcess = pendingUserBets || [];
     console.log(`Resolvendo ${toProcess.length} palpite(s) pendentes para aposta #${betId}`);
 
-    const winningPool = winningOption === 'A' ? Number(bet.pool_a || 100) : Number(bet.pool_b || 100);
+    const winningOptObj = bet.options ? bet.options.find(o => o.option_label === winningOption) : null;
+    const winningPool = winningOptObj ? Number(winningOptObj.pool || 100) : 100;
     const totalPool = Number(bet.total_pool || 200);
 
     for (let ub of toProcess) {
@@ -821,9 +880,36 @@ function openAdminCreateBetModal() {
   document.getElementById('adm-create-liquidity').value = '100.00';
   if (document.getElementById('adm-create-expires-at')) document.getElementById('adm-create-expires-at').value = '';
   if (document.getElementById('adm-create-scheduled-for')) document.getElementById('adm-create-scheduled-for').value = '';
+  
+  const optionsList = document.getElementById('adm-create-options-list');
+  if (optionsList) {
+    optionsList.innerHTML = '';
+    addCreateOption('Sim', 50);
+    addCreateOption('Não', 50);
+  }
+
   // Reset tipo
   setAdminBetType('CLASSIC');
   openModal('modal-admin-create-bet');
+}
+
+// ---- FUNÇÃO PARA ADICIONAR OPÇÃO DINÂMICA ----
+function addCreateOption(label = '', prob = '') {
+  const container = document.getElementById('adm-create-options-list');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'dynamic-option-item';
+  div.style = 'display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px;';
+  div.innerHTML = `
+    <div class="form-group" style="flex:2; margin-bottom:0;">
+      <input type="text" class="form-input opt-label-input" placeholder="Título da Opção (Ex: Sim)" value="${label}">
+    </div>
+    <div class="form-group" style="flex:1; margin-bottom:0; display:flex; align-items:center; justify-content:center; color:var(--text-gray); font-size:0.8rem; background:var(--slate-dark); padding:10px; border-radius:8px;">
+      Automático
+    </div>
+    <button type="button" class="btn-secondary" style="background:rgba(239,68,68,0.1);color:#EF4444;border-color:rgba(239,68,68,0.3);width:auto;padding:12px;" onclick="this.parentElement.remove()">❌</button>
+  `;
+  container.appendChild(div);
 }
 
 async function confirmAdminCreateBet() {
@@ -840,27 +926,38 @@ async function confirmAdminCreateBet() {
   const scheduledForStr = document.getElementById('adm-create-scheduled-for')?.value;
 
   let pA, pB, oddsA, oddsB;
+  let dynamicOptions = [];
 
   if (currentCreateBetType === 'CLASSIC') {
-    const probA = parseFloat(document.getElementById('adm-create-probA').value) || 50;
-    const probB = parseFloat(document.getElementById('adm-create-probB').value) || 50;
-    oddsA = probA > 0 ? (100 / probA) : 1.90;
-    oddsB = probB > 0 ? (100 / probB) : 1.90;
-    pA = liquidity * (probA / 100);
-    pB = liquidity * (probB / 100);
+    const optsNodes = document.querySelectorAll('.dynamic-option-item');
+    if (optsNodes.length < 2) {
+      showSnackbar('É necessário pelo menos 2 opções!');
+      return;
+    }
+    
+    const count = optsNodes.length;
+    const prob = 100 / count;
+    
+    optsNodes.forEach(node => {
+      const label = node.querySelector('.opt-label-input').value.trim() || 'Opção';
+      const optionId = 'OPT_' + Math.random().toString(36).substr(2, 9);
+      dynamicOptions.push({
+        id: optionId,
+        label,
+        prob,
+        odds: prob > 0 ? (100 / prob) : 99.00,
+        pool: liquidity / count
+      });
+    });
   } else {
-    // Para modo contador ou outros
-    pA = liquidity / 2;
-    pB = liquidity / 2;
-    oddsA = 1.90;
-    oddsB = 1.90;
+    // Para modo contador ou outros (fallbacks)
+    dynamicOptions.push({ id: 'OPT_A', label: 'Sim', prob: 50, odds: 2.0, pool: liquidity / 2 });
+    dynamicOptions.push({ id: 'OPT_B', label: 'Não', prob: 50, odds: 2.0, pool: liquidity / 2 });
   }
 
   let payload = {
     title, description: desc, category: cat,
     creator_name: 'Soberano Admin',
-    odds_a: oddsA, odds_b: oddsB,
-    pool_a: pA, pool_b: pB,
     status: 'OPEN', is_trending: true, total_pool: liquidity
   };
 
@@ -875,11 +972,7 @@ async function confirmAdminCreateBet() {
   }
 
   if (currentCreateBetType === 'CLASSIC') {
-    const optA = document.getElementById('adm-create-optA').value.trim() || 'Sim';
-    const optB = document.getElementById('adm-create-optB').value.trim() || 'Não';
     payload.bet_type = 'CLASSIC';
-    payload.option_a = optA;
-    payload.option_b = optB;
   } else {
     // COUNTER
     const location = document.getElementById('adm-create-location').value.trim();
@@ -911,19 +1004,37 @@ async function confirmAdminCreateBet() {
     if (newBetData && newBetData.length > 0) {
       const newBetId = newBetData[0].id;
       
-      // Admin atua como Liquidity Provider Real
+      // Inserir as opções dinâmicas
+      for (const opt of dynamicOptions) {
+        await supabaseClient.from('bet_options').insert({
+          bet_id: newBetId,
+          option_label: opt.id,
+          title: opt.label,
+          pool: opt.pool,
+          current_odds: opt.odds
+        });
+
+        // Registrar o primeiro histórico
+        await supabaseClient.from('bet_history').insert({
+          bet_id: newBetId,
+          option_label: opt.id,
+          odds: opt.odds
+        });
+
+        // Admin atua como Liquidity Provider Real
+        await supabaseClient.from('user_portfolios').insert({
+          bet_id: newBetId,
+          user_id: 'admin_user',
+          option_label: opt.id,
+          shares: opt.pool,
+          username: 'admin_user'
+        });
+      }
+      
       await supabaseClient.from('transactions').insert({
          amount: -liquidity,
          description: `Provisão de Liquidez: ${title}`,
          type: 'LIQUIDITY_ADD',
-         username: 'admin_user'
-      });
-      
-      await supabaseClient.from('user_portfolios').insert({
-         bet_id: newBetId,
-         user_id: 'admin_user',
-         shares_a: pA,
-         shares_b: pB,
          username: 'admin_user'
       });
     }
@@ -1506,6 +1617,26 @@ async function setCounterManual() {
 
 
 // ---- EDITAR APOSTA & AJUSTAR ODDS LIVE ----
+// ---- FUNÇÃO PARA ADICIONAR OPÇÃO DINÂMICA (EDIÇÃO) ----
+function addEditOption(label = '', optId = '') {
+  const container = document.getElementById('edit-dynamic-options-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'dynamic-option-item';
+  div.style = 'display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; margin-bottom:8px;';
+  div.innerHTML = `
+    <input type="hidden" class="opt-id-input" value="${optId}">
+    <div class="form-group" style="flex:2; margin-bottom:0;">
+      <input type="text" class="form-input opt-label-input" placeholder="Título da Opção (Ex: Sim)" value="${label}">
+    </div>
+    <div class="form-group" style="flex:1; margin-bottom:0; display:flex; align-items:center; justify-content:center; color:var(--text-gray); font-size:0.8rem; background:var(--slate-dark); padding:10px; border-radius:8px;">
+      Automático
+    </div>
+    <button type="button" class="btn-secondary" style="background:rgba(239,68,68,0.1);color:#EF4444;border-color:rgba(239,68,68,0.3);width:auto;padding:12px;" onclick="this.parentElement.remove()">❌</button>
+  `;
+  container.appendChild(div);
+}
+
 function openAdminEditBetModal(betId) {
   const bet = adminStore.bets.find(b => Number(b.id) === Number(betId));
   if (!bet) return;
@@ -1514,13 +1645,19 @@ function openAdminEditBetModal(betId) {
   document.getElementById('adm-edit-title').value = bet.title;
   document.getElementById('adm-edit-desc').value = bet.description;
   document.getElementById('adm-edit-category').value = bet.category;
-  document.getElementById('adm-edit-optA').value = bet.option_a;
-  document.getElementById('adm-edit-optB').value = bet.option_b;
-  const probA = Math.round(100 / (parseFloat(bet.odds_a) || 1.90));
-  const probB = Math.round(100 / (parseFloat(bet.odds_b) || 1.90));
-  document.getElementById('adm-edit-probA').value = probA;
-  document.getElementById('adm-edit-probB').value = probB;
   document.getElementById('adm-edit-liquidity').value = '0.00';
+
+  const container = document.getElementById('edit-dynamic-options-container');
+  if (container) {
+    container.innerHTML = '';
+    const options = adminStore.betOptions.filter(o => Number(o.bet_id) === Number(betId));
+    if (options.length > 0) {
+      options.forEach(opt => addEditOption(opt.title, opt.id));
+    } else {
+      addEditOption('Opção A', '');
+      addEditOption('Opção B', '');
+    }
+  }
 
   openModal('modal-admin-edit-bet');
 }
@@ -1530,42 +1667,83 @@ async function confirmAdminEditBet() {
   const title = document.getElementById('adm-edit-title').value.trim();
   const desc = document.getElementById('adm-edit-desc').value.trim();
   const cat = document.getElementById('adm-edit-category').value;
-  const optA = document.getElementById('adm-edit-optA').value.trim();
-  const optB = document.getElementById('adm-edit-optB').value.trim();
-  const probA = parseFloat(document.getElementById('adm-edit-probA').value) || 50;
-  const probB = parseFloat(document.getElementById('adm-edit-probB').value) || 50;
   const injectLiquidity = parseFloat(document.getElementById('adm-edit-liquidity').value) || 0;
 
-  if (!id || !title || !desc || !optA || !optB) {
-    showSnackbar('Preencha todos os campos!');
+  if (!id || !title || !desc) {
+    showSnackbar('Preencha título e descrição!');
     return;
   }
 
-  const oddsA = probA > 0 ? (100 / probA) : 1.90;
-  const oddsB = probB > 0 ? (100 / probB) : 1.90;
+  const container = document.getElementById('edit-dynamic-options-container');
+  const items = container.querySelectorAll('.dynamic-option-item');
+  if (items.length < 2) {
+    showSnackbar('Você deve fornecer pelo menos 2 opções de aposta.');
+    return;
+  }
+
+  let finalOptions = [];
+  for (let i = 0; i < items.length; i++) {
+    const input = items[i].querySelector('.opt-label-input');
+    const idInput = items[i].querySelector('.opt-id-input');
+    const txt = input.value.trim();
+    const optId = idInput.value;
+    if (!txt) {
+      showSnackbar('Todos os títulos de opção devem estar preenchidos!');
+      return;
+    }
+    finalOptions.push({ optId: optId, label: txt, code: 'OPT_' + (i + 1) });
+  }
 
   const bet = adminStore.bets.find(b => b.id == id);
   if (!bet) return;
 
-  let newTotalPool = parseFloat(bet.total_pool) || 0;
-  newTotalPool += injectLiquidity;
-
-  const newPoolA = newTotalPool * (probA / 100);
-  const newPoolB = newTotalPool * (probB / 100);
-
   try {
+    let newTotalPool = parseFloat(bet.total_pool) || 0;
+    newTotalPool += injectLiquidity;
+
     await supabaseClient.from('bets').update({
       title,
       description: desc,
       category: cat,
-      option_a: optA,
-      option_b: optB,
-      odds_a: oddsA,
-      odds_b: oddsB,
-      pool_a: newPoolA,
-      pool_b: newPoolB,
       total_pool: newTotalPool
     }).eq('id', id);
+
+    const existingDbOptions = adminStore.betOptions.filter(o => Number(o.bet_id) === Number(id));
+    
+    // Deletar removidas
+    for (const dbOpt of existingDbOptions) {
+      if (!finalOptions.find(fo => String(fo.optId) === String(dbOpt.id))) {
+        await supabaseClient.from('bet_options').delete().eq('id', dbOpt.id);
+      }
+    }
+
+    const poolShare = injectLiquidity > 0 ? (injectLiquidity / finalOptions.length) : 0;
+
+    // Atualizar/Inserir
+    for (const fo of finalOptions) {
+      if (fo.optId) {
+        const dbOpt = existingDbOptions.find(o => String(o.id) === String(fo.optId));
+        if (dbOpt) {
+           let newPool = parseFloat(dbOpt.pool) + poolShare;
+           let odds = newPool > 0 ? (newTotalPool / newPool) : (finalOptions.length);
+           await supabaseClient.from('bet_options').update({
+             title: fo.label,
+             pool: newPool,
+             current_odds: odds
+           }).eq('id', fo.optId);
+        }
+      } else {
+        let newPool = poolShare || 1;
+        let odds = newTotalPool / newPool;
+        await supabaseClient.from('bet_options').insert({
+          bet_id: id,
+          option_label: fo.code,
+          title: fo.label,
+          pool: newPool,
+          current_odds: odds
+        });
+      }
+    }
 
     if (injectLiquidity > 0) {
       await supabaseClient.from('transactions').insert({
@@ -1575,17 +1753,10 @@ async function confirmAdminEditBet() {
         status: 'COMPLETED',
         username: 'admin_user'
       });
-      await supabaseClient.from('user_portfolios').insert({
-        bet_id: id,
-        user_id: 'admin_user',
-        username: 'admin_user',
-        shares_a: injectLiquidity * (probA / 100),
-        shares_b: injectLiquidity * (probB / 100)
-      });
     }
 
     closeModal('modal-admin-edit-bet');
-    showSnackbar('⚡ Odds e detalhes atualizados em tempo real no Supabase!');
+    showSnackbar('⚡ Aposta atualizada com sucesso!');
     loadAdminData();
   } catch (err) {
     console.error('Erro ao editar aposta:', err);
@@ -1631,7 +1802,7 @@ function renderAdminUsersView(query = '') {
           <tbody>
             ${users.map(u => {
               // Saldo acumulado
-              const userTx = (adminStore.transactions || []).filter(t => t.description && t.description.includes(u.username));
+              const userTx = (adminStore.transactions || []).filter(t => t.username === u.username);
               const calculatedBal = userTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
               const displayBal = u.balance !== undefined && u.balance !== null ? Number(u.balance) : Math.max(0, calculatedBal);
 
@@ -1687,7 +1858,7 @@ function openAdminEditUserModal(userId) {
   document.getElementById('adm-user-edit-xp').value = u.xp || 0;
 
   // Saldo
-  const userTx = (adminStore.transactions || []).filter(t => t.description && t.description.includes(u.username));
+  const userTx = (adminStore.transactions || []).filter(t => t.username === u.username);
   const calculatedBal = userTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
   const currentBal = u.balance !== undefined && u.balance !== null ? Number(u.balance) : Math.max(0, calculatedBal);
   document.getElementById('adm-user-edit-balance').value = currentBal.toFixed(2);
@@ -1720,7 +1891,7 @@ async function confirmAdminEditUser() {
     await supabaseClient.from('profiles').update(updatePayload).eq('id', id);
 
     // 2. Se o saldo foi modificado, gera uma transação de ajuste no banco para consistência
-    const userTx = (adminStore.transactions || []).filter(t => t.description && t.description.includes(oldUsername));
+    const userTx = (adminStore.transactions || []).filter(t => t.username === oldUsername);
     const currentCalculated = userTx.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const diff = newBalance - currentCalculated;
 
@@ -1728,7 +1899,9 @@ async function confirmAdminEditUser() {
       await supabaseClient.from('transactions').insert({
         amount: diff,
         description: `Ajuste de Saldo CRM Admin para ${username} (Novo Saldo: R$ ${newBalance.toFixed(2)})`,
-        type: 'ADMIN_ADJUSTMENT'
+        type: 'ADMIN_ADJUSTMENT',
+        username: username,
+        status: 'COMPLETED'
       });
     }
 
@@ -1780,7 +1953,9 @@ async function confirmAdminCreateUser() {
       await supabaseClient.from('transactions').insert({
         amount: initialBal,
         description: `Depósito Inicial de Cadastro para ${username}`,
-        type: 'DEPOSIT'
+        type: 'DEPOSIT',
+        username: username,
+        status: 'COMPLETED'
       });
     }
 
@@ -1814,8 +1989,10 @@ async function confirmAdminGrantBonus() {
   try {
     await supabaseClient.from('transactions').insert({
       amount: amount,
-      description: `${reason} para ${username}`,
-      type: 'DEPOSIT'
+      description: reason,
+      type: 'ADMIN_BONUS',
+      username: username,
+      status: 'COMPLETED'
     });
 
     closeModal('modal-admin-user-bonus');

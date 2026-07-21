@@ -607,10 +607,11 @@ button, a, [role="button"] {
    ============================================= */
 .bet-card {
   background: var(--card-dark);
-  border-radius: var(--radius-lg);
-  padding: 14px;
-  margin-bottom: 10px;
-  box-shadow: var(--shadow-card);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transition: var(--transition);
 }
 
@@ -668,10 +669,11 @@ button, a, [role="button"] {
 
 .bet-title {
   font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--text-white);
-  margin-bottom: 4px;
-  line-height: 1.3;
+  font-size: 1.05rem;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
 }
 
 .bet-desc {
@@ -704,17 +706,22 @@ button, a, [role="button"] {
 }
 
 .odds-btn {
-  background: var(--slate-dark);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
   padding: 10px 12px;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: var(--transition);
+  transition: all 0.2s ease;
   font-family: inherit;
   min-height: var(--touch-min);
+}
+
+.odds-btn:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.15);
 }
 
 .odds-btn:active {
@@ -722,33 +729,33 @@ button, a, [role="button"] {
 }
 
 .odds-btn.buy-yes {
-  background: var(--neon-emerald);
-  border-color: var(--neon-emerald);
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .odds-btn.buy-yes:hover {
-  background: #0ea5e9; /* Um tom um pouco mais escuro ou o mesmo se for mobile sem hover */
-  transform: scale(0.98);
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
 .odds-btn.buy-yes .odds-value,
 .odds-btn.buy-yes .odds-label {
-  color: var(--slate-dark);
+  color: var(--neon-emerald);
 }
 
 .odds-btn.buy-no {
-  background: #EF4444;
-  border-color: #EF4444;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .odds-btn.buy-no:hover {
-  background: #DC2626;
-  transform: scale(0.98);
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .odds-btn.buy-no .odds-value,
 .odds-btn.buy-no .odds-label {
-  color: #FFFFFF;
+  color: #EF4444;
 }
 
 .odds-label {
@@ -764,8 +771,9 @@ button, a, [role="button"] {
 }
 
 .odds-value {
+  color: #10B981;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   flex-shrink: 0;
 }
 
