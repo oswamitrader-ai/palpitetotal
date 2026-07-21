@@ -51,7 +51,7 @@ function loadStore() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.bets && parsed.bets.length > 0) return parsed;
+      if (parsed) return parsed;
     }
   } catch (e) { /* ignore */ }
   return null;
@@ -125,7 +125,7 @@ async function syncFromSupabase() {
     });
   }
 
-    const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').order('id', { ascending: true });
+    const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').eq('username', store.profile.username).order('id', { ascending: true });
     if (dbUserBets && dbUserBets.length > 0) {
       store.userBets = dbUserBets.map(ub => ({
         id: Number(ub.id),
@@ -141,7 +141,7 @@ async function syncFromSupabase() {
       }));
     }
 
-    const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').order('id', { ascending: true });
+    const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true });
     if (dbPortfolios && dbPortfolios.length > 0) {
       store.portfolios = dbPortfolios.map(p => ({
         id: Number(p.id),
@@ -153,7 +153,7 @@ async function syncFromSupabase() {
       store.portfolios = [];
     }
 
-    const { data: dbTx } = await supabaseClient.from('transactions').select('*').order('id', { ascending: true });
+    const { data: dbTx } = await supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true });
     if (dbTx && dbTx.length > 0) {
       store.transactions = dbTx.map(t => ({
         id: Number(t.id),
@@ -1164,7 +1164,7 @@ async function executePlaceBet(bet, option, amount, price, shares) {
       // 1. Call RPC for limit order execution
       const { data: orderId, error } = await supabaseClient.rpc('place_limit_order', {
         p_bet_id: bet.id,
-        p_user_id: 'default_user',
+        p_user_id: store.profile.username,
         p_option: option,
         p_order_type: tradeMode,
         p_price: price,
@@ -1178,7 +1178,8 @@ async function executePlaceBet(bet, option, amount, price, shares) {
         await supabaseClient.from('transactions').insert({
           amount: -amount,
           description: `Compra de ${shares} Cotas: ${bet.title}`,
-          type: 'BET_PLACED'
+          type: 'BET_PLACED',
+          username: store.profile.username
         });
 
         // Atualiza a barra de volume e as odds do evento para os próximos compradores! (AMM Shift)
@@ -1718,7 +1719,8 @@ async function confirmDepositPayment() {
         amount: amount,
         description: `Depósito Pix Confirmado (R$ ${amount.toFixed(2)})`,
         type: 'DEPOSIT',
-        status: 'PENDING'
+        status: 'PENDING',
+        username: store.profile.username
       }).select();
       if (data && data[0]) assignedTxId = Number(data[0].id);
     } catch (e) {
@@ -1780,7 +1782,8 @@ async function confirmWithdraw() {
         amount: -amount,
         description: desc,
         type: 'WITHDRAWAL',
-        status: 'PENDING'
+        status: 'PENDING',
+        username: store.profile.username
       }).select();
       if (data && data[0]) assignedTxId = Number(data[0].id);
     } catch (e) {
@@ -2241,13 +2244,24 @@ async function confirmRegister() {
   store.profile.interests = interests;
 
   // Credit Bônus R$1000
+  const bonusAmount = appSettings.welcome_bonus || 1000;
   store.transactions.push({
     id: store.nextTxId++,
-    amount: 1000,
+    amount: bonusAmount,
     description: 'Bônus de Cadastro Novo Apostador',
     type: 'DEPOSIT',
     timestamp: Date.now()
   });
+
+  if (supabaseClient) {
+    supabaseClient.from('transactions').insert({
+      amount: bonusAmount,
+      description: 'Bônus de Cadastro Novo Apostador',
+      type: 'DEPOSIT',
+      status: 'COMPLETED',
+      username: username
+    }).then();
+  }
 
   addXp(150);
 

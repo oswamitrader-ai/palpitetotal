@@ -599,14 +599,16 @@ async function republishAdminBet(betId) {
       await supabaseClient.from('transactions').insert({
          amount: -liquidity,
          description: `Provisão de Liquidez (Republicado): ${b.title}`,
-         type: 'LIQUIDITY_ADD'
+         type: 'LIQUIDITY_ADD',
+         username: 'admin_user'
       });
       
       await supabaseClient.from('user_portfolios').insert({
          bet_id: newBetId,
          user_id: 'admin_user',
          shares_a: pA,
-         shares_b: pB
+         shares_b: pB,
+         username: 'admin_user'
       });
     }
 
@@ -682,7 +684,8 @@ async function resolveBetAdmin(betId, winningOption) {
         await supabaseClient.from('transactions').insert({
           amount: actualPayout,
           description: `Prêmio ganho: ${bet.title}`,
-          type: 'BET_WON'
+          type: 'BET_WON',
+          username: ub.username
         });
         showSnackbar(`🏆 Apostador ganhou R$ ${actualPayout.toFixed(2)} em: ${bet.title}`);
       }
@@ -758,7 +761,8 @@ async function autoExpireBet(bet) {
       await supabaseClient.from('transactions').insert({
         amount: Number(ub.amount),
         description: `Reembolso: "${bet.title}" expirou sem resultado`,
-        type: 'REFUND'
+        type: 'REFUND',
+        username: ub.username
       });
     }
 
@@ -897,14 +901,16 @@ async function confirmAdminCreateBet() {
       await supabaseClient.from('transactions').insert({
          amount: -liquidity,
          description: `Provisão de Liquidez: ${title}`,
-         type: 'LIQUIDITY_ADD'
+         type: 'LIQUIDITY_ADD',
+         username: 'admin_user'
       });
       
       await supabaseClient.from('user_portfolios').insert({
          bet_id: newBetId,
          user_id: 'admin_user',
          shares_a: pA,
-         shares_b: pB
+         shares_b: pB,
+         username: 'admin_user'
       });
     }
 
