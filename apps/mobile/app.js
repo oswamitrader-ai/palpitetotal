@@ -619,7 +619,7 @@ function renderFeed() {
     const val = searchInput.value.trim();
     const currentUsername = (store?.profile?.username || '').toLowerCase();
     const lowerVal = val.toLowerCase();
-    if (val.includes('@') || lowerVal === currentUsername || lowerVal === 'palpiteiromestre' || lowerVal.includes('oswamitrader')) {
+    if (val.includes('@') || lowerVal === currentUsername || lowerVal.includes('oswamitrader')) {
       searchInput.value = '';
     }
   }
@@ -2066,7 +2066,7 @@ window.addEventListener('load', () => {
       if (el && el.value) {
         const v = el.value.trim().toLowerCase();
         const u = (store?.profile?.username || '').toLowerCase();
-        if (v.includes('@') || v === u || v === 'palpiteiromestre' || v.includes('oswamitrader')) {
+        if (v.includes('@') || v === u || v.includes('oswamitrader')) {
           el.value = '';
           renderFeed();
         }
