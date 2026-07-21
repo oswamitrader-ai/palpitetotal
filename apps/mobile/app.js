@@ -739,9 +739,9 @@ function renderBetCard(bet, isTrending) {
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const urgentColor = diff < 3600000 ? '#EF4444' : 'var(--gold-accent)';
-            return `<span style="font-size:0.7rem;font-weight:700;color:${urgentColor};">⏰ ${h}h ${m}min</span>`;
+            return `<span id="countdown-${bet.id}" data-expires="${bet.expiresAt}" style="font-size:0.7rem;font-weight:700;color:${urgentColor};">⏰ ${h}h ${m}min</span>`;
           } else {
-            return `<span style="font-size:0.7rem;font-weight:700;color:#EF4444;">⏰ Encerrando...</span>`;
+            return `<span id="countdown-${bet.id}" data-expires="${bet.expiresAt}" style="font-size:0.7rem;font-weight:700;color:#EF4444;">⏰ Encerrando...</span>`;
           }
         })() : ''}
       </div>
@@ -892,7 +892,17 @@ function renderCounterBetCard(bet) {
       </div>
       <div class="counter-card-footer">
         <div class="counter-pool-info">Pool total: <strong>${formatMoney(bet.totalPool || 0)}</strong></div>
-        <span style="font-size:0.65rem;color:var(--text-gray);">Criado por ${bet.creatorName}</span>
+        ${bet.expiresAt ? (() => {
+          const diff = bet.expiresAt - Date.now();
+          if (diff > 0) {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const urgentColor = diff < 3600000 ? '#EF4444' : 'var(--gold-accent)';
+            return `<span id="countdown-${bet.id}" data-expires="${bet.expiresAt}" style="font-size:0.7rem;font-weight:700;color:${urgentColor};">⏰ ${h}h ${m}min</span>`;
+          } else {
+            return `<span id="countdown-${bet.id}" data-expires="${bet.expiresAt}" style="font-size:0.7rem;font-weight:700;color:#EF4444;">⏰ Encerrando...</span>`;
+          }
+        })() : `<span style="font-size:0.65rem;color:var(--text-gray);">Criado por ${bet.creatorName}</span>`}
       </div>
     </div>
   `;
@@ -2025,6 +2035,26 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 // ---- INITIAL RENDER ----
 renderCurrentTab();
+
+// Loop para atualizar countdowns de expiração na tela sem precisar dar reload
+setInterval(() => {
+  document.querySelectorAll('span[id^="countdown-"]').forEach(el => {
+    const expiresAt = Number(el.getAttribute('data-expires'));
+    if (!expiresAt) return;
+    const diff = expiresAt - Date.now();
+    
+    if (diff > 0) {
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const urgentColor = diff < 3600000 ? '#EF4444' : 'var(--gold-accent)';
+      el.style.color = urgentColor;
+      el.innerHTML = `⏰ ${h}h ${m}min`;
+    } else {
+      el.style.color = '#EF4444';
+      el.innerHTML = `⏰ Encerrando...`;
+    }
+  });
+}, 60000); // Atualiza a cada 1 minuto
 
 // Limpa campo de busca para evitar autofill automático do navegador
 document.addEventListener('DOMContentLoaded', () => {
