@@ -93,6 +93,8 @@ async function syncFromSupabase() {
         status: ub.status,
         createdAt: new Date(ub.created_at).getTime()
       }));
+    } else {
+      store.userBets = [];
     }
 
     const { data: dbTx } = await supabaseClient.from('transactions').select('*').order('id', { ascending: true });
@@ -104,6 +106,8 @@ async function syncFromSupabase() {
         type: t.type,
         timestamp: new Date(t.timestamp).getTime()
       }));
+    } else {
+      store.transactions = [];
     }
 
     const { data: dbPosts } = await supabaseClient.from('posts').select('*').order('id', { ascending: false });
@@ -122,6 +126,8 @@ async function syncFromSupabase() {
         likes: p.likes,
         timestamp: new Date(p.timestamp).getTime()
       }));
+    } else {
+      store.posts = [];
     }
 
     if (isLoggedIn && store.profile.username) {

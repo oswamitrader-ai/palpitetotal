@@ -132,6 +132,8 @@ async function syncFromSupabase() {
         status: ub.status,
         createdAt: new Date(ub.created_at).getTime()
       }));
+    } else {
+      store.userBets = [];
     }
 
     const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true });
@@ -156,6 +158,8 @@ async function syncFromSupabase() {
         status: t.status || 'COMPLETED',
         timestamp: new Date(t.timestamp).getTime()
       }));
+    } else {
+      store.transactions = [];
     }
 
     const { data: dbPosts } = await supabaseClient.from('posts').select('*').order('id', { ascending: false });
@@ -163,17 +167,19 @@ async function syncFromSupabase() {
       store.posts = dbPosts.map(p => ({
         id: Number(p.id),
         username: p.username,
-        userLevel: p.user_level,
+        userLevel: Number(p.user_level),
         userBadge: p.user_badge,
-        betId: p.bet_id ? Number(p.bet_id) : null,
+        betId: Number(p.bet_id),
         betTitle: p.bet_title,
         chosenOption: p.chosen_option,
         chosenOptionText: p.chosen_option_text,
-        odds: Number(p.odds || 1.90),
+        odds: Number(p.odds),
         comment: p.comment,
-        likes: p.likes || 0,
-        timestamp: p.created_at ? new Date(p.created_at).getTime() : Date.now()
+        likes: Number(p.likes),
+        timestamp: new Date(p.created_at).getTime()
       }));
+    } else {
+      store.posts = [];
     }
 
     if (isLoggedIn && store.profile.username) {
