@@ -1,0 +1,6 @@
+{
+  "appId": "com.palpitetotal.app",
+  "appName": "PalpiteTotal",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

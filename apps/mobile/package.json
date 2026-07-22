@@ -4,6 +4,15 @@
   "description": "App móvel de apostas PalpiteTotal",
   "scripts": {
     "dev": "npx -y lite-server -c bs-config.json --port=3000",
-    "dev:mobile": "npx -y lite-server -c bs-config.json --port=3000"
+    "dev:mobile": "npx -y lite-server -c bs-config.json --port=3000",
+    "build": "mkdir www 2>nul || cd . && copy index.html www\\index.html && copy index.css www\\index.css && copy app.js www\\app.js && copy pix_qrcode.png www\\pix_qrcode.png",
+    "sync": "npm run build && npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/core": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
   }
 }
