@@ -45,11 +45,17 @@ function getDefaultStore() {
 }
 
 function loadStore() {
+  try {
+    const cached = localStorage.getItem(STORE_KEY);
+    if (cached) return JSON.parse(cached);
+  } catch(e) {}
   return null;
 }
 
-function saveStore(store) {
-  // Store is now fully driven by Supabase. No localStorage.
+function saveStore(s) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  } catch(e) {}
 }
 
 let store = loadStore() || getDefaultStore();
@@ -72,17 +78,28 @@ let appSettings = {
 async function syncFromSupabase() {
   if (!supabaseClient) return;
   try {
-    const { data: stData } = await supabaseClient.from('platform_settings').select('*').eq('id', 'default').single();
+    // ALL queries in parallel for maximum speed
+    const [settingsRes, betsRes, betOptionsRes, betHistoryRes, catRes, userBetsRes, ordersRes, portfoliosRes, txRes, postsRes, profilesRes, likesRes, commentsRes] = await Promise.all([
+      supabaseClient.from('platform_settings').select('*').eq('id', 'default').single(),
+      supabaseClient.from('bets').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_options').select('*').order('id', { ascending: true }),
+      supabaseClient.from('bet_history').select('*').order('created_at', { ascending: true }),
+      supabaseClient.from('categories').select('*').order('name', { ascending: true }),
+      supabaseClient.from('user_bets').select('*').eq('username', store.profile.username).order('id', { ascending: true }),
+      supabaseClient.from('orders').select('*').eq('user_id', store.profile.username).eq('status', 'OPEN'),
+      supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true }),
+      supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true }),
+      supabaseClient.from('posts').select('*').order('id', { ascending: false }),
+      isLoggedIn && store.profile.username ? supabaseClient.from('profiles').select('*').eq('username', store.profile.username) : Promise.resolve({ data: null }),
+      supabaseClient.from('post_likes').select('*').catch(() => ({ data: [] })),
+      supabaseClient.from('post_comments').select('*').order('created_at', { ascending: true }).catch(() => ({ data: [] }))
+    ]);
+
+    const stData = settingsRes.data;
     if (stData) {
       appSettings = stData;
     }
 
-    const [betsRes, betOptionsRes, betHistoryRes, catRes] = await Promise.all([
-      supabaseClient.from('bets').select('*').order('id', { ascending: true }),
-      supabaseClient.from('bet_options').select('*').order('id', { ascending: true }),
-      supabaseClient.from('bet_history').select('*').order('created_at', { ascending: true }),
-      supabaseClient.from('categories').select('*').order('name', { ascending: true })
-    ]);
 
     const dbBets = betsRes.data;
     const dbBetOptions = betOptionsRes.data || [];
@@ -121,7 +138,7 @@ async function syncFromSupabase() {
     });
   }
 
-    const { data: dbUserBets } = await supabaseClient.from('user_bets').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+    const dbUserBets = userBetsRes.data;
     if (dbUserBets && dbUserBets.length > 0) {
       store.userBets = dbUserBets.map(ub => ({
         id: Number(ub.id),
@@ -140,7 +157,7 @@ async function syncFromSupabase() {
     }
 
     // Fetch new AMM Orders and map them to userBets (Pending)
-    const { data: dbOrders } = await supabaseClient.from('orders').select('*').eq('user_id', store.profile.username).eq('status', 'OPEN');
+    const dbOrders = ordersRes.data;
     if (dbOrders && dbOrders.length > 0) {
       dbOrders.forEach(order => {
         const bet = store.bets.find(b => Number(b.id) === Number(order.bet_id));
@@ -163,7 +180,7 @@ async function syncFromSupabase() {
       });
     }
 
-    const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+    const dbPortfolios = portfoliosRes.data;
     if (dbPortfolios && dbPortfolios.length > 0) {
       store.portfolios = dbPortfolios.map(p => ({
         id: Number(p.id),
@@ -173,7 +190,7 @@ async function syncFromSupabase() {
       }));
     }
 
-    const { data: dbTx } = await supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true });
+    const dbTx = txRes.data;
     if (dbTx && dbTx.length > 0) {
       store.transactions = dbTx.map(t => ({
         id: Number(t.id),
@@ -187,7 +204,19 @@ async function syncFromSupabase() {
       store.transactions = [];
     }
 
-    const { data: dbPosts } = await supabaseClient.from('posts').select('*').order('id', { ascending: false });
+    
+    // Populate Likes and Comments
+    if (likesRes && likesRes.data) {
+      store.postLikes = likesRes.data;
+    } else {
+      store.postLikes = store.postLikes || [];
+    }
+    if (commentsRes && commentsRes.data) {
+      store.postComments = commentsRes.data;
+    } else {
+      store.postComments = store.postComments || [];
+    }
+const dbPosts = postsRes.data;
     if (dbPosts && dbPosts.length > 0) {
       store.posts = dbPosts.map(p => ({
         id: Number(p.id),
@@ -208,7 +237,7 @@ async function syncFromSupabase() {
     }
 
     if (isLoggedIn && store.profile.username) {
-      const { data: dbProfiles } = await supabaseClient.from('profiles').select('*').eq('username', store.profile.username);
+      const dbProfiles = profilesRes.data;
       if (dbProfiles && dbProfiles.length > 0) {
         const p = dbProfiles[0];
         store.profile = {
@@ -478,11 +507,16 @@ async function initApp() {
   
     setAppVisibility(true);
   switchTab('feed');
-  renderCurrentTab(); // Show local cached data immediately!
+  renderCurrentTab(); // Show local cached data INSTANTLY!
   
-  await syncFromSupabase();
-  initRealtimeSubscriptions();
-  renderCurrentTab(); // Re-render with fresh data from cloud
+  // Sync from Supabase in background - UI already visible with cached data
+  syncFromSupabase().then(() => {
+    renderCurrentTab();
+    initRealtimeSubscriptions();
+  }).catch(err => {
+    console.warn('Sync error:', err);
+    initRealtimeSubscriptions();
+  });
 }
 
 // Inicializa a aplicação (movido para o final do arquivo)
@@ -522,6 +556,19 @@ function getBalance() {
 
 function formatMoney(val) {
   return 'R$ ' + val.toFixed(2).replace('.', ',');
+}
+
+
+function formatTimeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'Agora';
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h';
+  const d = Math.floor(h / 24);
+  return d + 'd';
 }
 
 function formatDate(ts) {
@@ -756,18 +803,15 @@ function renderFeed() {
 }
 
 function renderAllCharts(bets) {
-  // Evitar erro se Chart não estiver definido (ex: se o script não carregou)
   if (typeof Chart === 'undefined') return;
 
   bets.forEach(bet => {
     const canvas = document.getElementById(`chart-${bet.id}`);
     if (!canvas) return;
 
-    if (!bet.history || bet.history.length === 0) return; // Sem dados
+    if (!bet.history || bet.history.length === 0) return;
 
     const ctx = canvas.getContext('2d');
-    
-    // Agrupar histórico por option_label
     const datasets = [];
     const colors = ['#10B981', '#EF4444', '#FBBF24', '#3B82F6', '#A855F7'];
     
@@ -776,19 +820,31 @@ function renderAllCharts(bets) {
         const hist = bet.history.filter(h => h.option_label === opt.option_label).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
         
         if (hist.length > 0) {
-          // Se tiver apenas 1 ponto, duplica ele no passado para desenhar uma linha reta inicial
           const plotData = hist.map(h => ({ x: new Date(h.created_at).getTime(), y: (100 / (h.odds || 1)) }));
           if (plotData.length === 1) {
-             plotData.unshift({ x: plotData[0].x - 3600000, y: plotData[0].y }); // 1h atrás
+             plotData.unshift({ x: plotData[0].x - 3600000, y: plotData[0].y });
           }
           
           datasets.push({
             label: opt.title,
             data: plotData,
             borderColor: colors[idx % colors.length],
-            borderWidth: 2,
+            backgroundColor: (context) => {
+              const ctx = context.chart.ctx;
+              const gradient = ctx.createLinearGradient(0, 0, 0, 150);
+              gradient.addColorStop(0, colors[idx % colors.length] + '40');
+              gradient.addColorStop(1, colors[idx % colors.length] + '00');
+              return gradient;
+            },
+            borderWidth: 2.5,
+            fill: true,
             tension: 0.4,
-            pointRadius: plotData.length === 1 ? 2 : 0
+            pointRadius: 1.5,
+            pointHitRadius: 25,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: colors[idx % colors.length],
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2
           });
         }
       });
@@ -801,11 +857,46 @@ function renderAllCharts(bets) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { 
+              display: true, 
+              position: 'top', 
+              labels: { color: 'rgba(255,255,255,0.7)', usePointStyle: true, boxWidth: 8, font: { size: 10 } } 
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: 'rgba(148, 163, 184, 1)',
+              titleFont: { size: 11 },
+              bodyFont: { size: 13, weight: 'bold' },
+              padding: 12,
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              displayColors: true,
+              callbacks: {
+                label: function(context) {
+                  const prob = context.parsed.y;
+                  const odd = (100 / prob).toFixed(2);
+                  return `${context.dataset.label}: ${prob.toFixed(1)}% (Odd ${odd})`;
+                }
+              }
+            }
+          },
           scales: {
-            x: { type: 'time', display: false },
-            y: { display: false, min: 0, max: 100 }
-          }
+            x: { 
+              type: 'time', 
+              display: false 
+            },
+            y: { 
+              display: true, 
+              min: 0, 
+              max: 100,
+              grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+              ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, callback: function(value) { return value + '%' } }
+            }
+          },
+          interaction: { mode: 'index', intersect: false }
         }
       });
     }
@@ -863,7 +954,10 @@ function renderBetCard(bet, isTrending) {
       ` : `<div class="bet-desc">${bet.description}</div>`}
       
       <!-- Volatility Chart -->
-      <div style="height: 60px; margin: 10px 0; width: 100%;">
+      <div style="margin-top: 10px; margin-bottom: 4px;">
+        <span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-gray); font-weight: 700;">📊 Probabilidade no Tempo <span style="font-size: 0.55rem; font-weight: 400; opacity: 0.7; text-transform: none;">(Toque p/ detalhes)</span></span>
+      </div>
+      <div style="height: 140px; margin-bottom: 16px; width: 100%;">
          <canvas id="chart-${bet.id}" class="volatility-chart"></canvas>
       </div>
 
@@ -1403,52 +1497,55 @@ async function executePlaceBet(bet, optionLabel, amount, price, shares) {
 
 // ---- SOCIAL TAB ----
 function renderSocial() {
-  const list = document.getElementById('social-list');
-  if (store.posts.length === 0) {
-    list.innerHTML = `<div class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <h3>Nenhuma postagem comunitária ainda</h3>
-      <p>Clique em 'Nova Postagem' acima para compartilhar suas análises!</p>
-    </div>`;
+  const container = document.getElementById('social-list');
+  if (!container) return;
+  if (!store.posts || store.posts.length === 0) {
+    container.innerHTML = '<div class="empty-state">Nenhuma postagem ainda. Seja o primeiro!</div>';
     return;
   }
+  
+  container.innerHTML = store.posts.map(p => {
+    // Calcular Likes
+    const postLikes = (store.postLikes || []).filter(l => l.post_id === p.id);
+    const totalLikes = (p.likes || 0) + postLikes.length;
+    const hasLiked = store.profile && store.profile.username && postLikes.some(l => l.username === store.profile.username);
+    
+    // Calcular Comments
+    const postComments = (store.postComments || []).filter(c => c.post_id === p.id);
+    const totalComments = postComments.length;
 
-  list.innerHTML = store.posts.map(post => {
-    const bet = post.betId ? store.bets.find(b => Number(b.id) === Number(post.betId)) : null;
-    const isOpen = bet && bet.status === 'OPEN';
+    const likeIconFill = hasLiked ? 'var(--neon-emerald)' : 'none';
+    const likeIconColor = hasLiked ? 'var(--neon-emerald)' : 'currentColor';
+
     return `
       <div class="post-card">
         <div class="post-header">
           <div class="post-user">
-            <div class="post-avatar">${(post.username || 'P').charAt(0).toUpperCase()}</div>
-            <div>
-              <div>
-                <span class="post-username">${post.username}</span>
-                <span class="post-level-badge">Nív. ${post.userLevel || 1}</span>
-              </div>
-              <div class="post-badge-text">${post.userBadge || 'Palpiteiro'}</div>
+            <div class="post-avatar">${p.username.charAt(0).toUpperCase()}</div>
+            <div class="post-user-info">
+              <span class="post-username">${p.username}</span>
             </div>
           </div>
-          <span class="post-time">${timeAgo(post.timestamp || Date.now())}</span>
+          <span class="post-time">${formatTimeAgo(p.timestamp)}</span>
         </div>
-        <div class="post-comment">${post.comment}</div>
-        ${post.betTitle ? `
-        <div class="post-slip">
-          <div class="post-slip-title">${post.betTitle}</div>
-          <div class="post-slip-row">
-            <span class="post-slip-choice">Palpite: <strong>${post.chosenOptionText || 'Sim'}</strong></span>
-            <span class="post-slip-odds">${Number(post.odds || 1.90).toFixed(2)}</span>
+        <p class="post-text">${p.comment}</p>
+        ${p.betTitle ? `<div class="post-bet-ref">
+          <div style="font-size:0.75rem;color:var(--text-gray);margin-bottom:4px;">Apostou em:</div>
+          <div style="font-weight:600;color:var(--text-white);margin-bottom:6px;">${p.betTitle}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);padding:6px;border-radius:4px;">
+            <span style="color:var(--neon-emerald);font-weight:600;">${p.chosenOptionText}</span>
+            <span style="color:var(--gold-accent);font-weight:700;">Odd ${p.odds ? p.odds.toFixed(2) : '1.00'}</span>
           </div>
         </div>` : ''}
-        <div class="post-actions">
-          <button class="like-btn" onclick="likePost(${post.id})">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            <span>${post.likes || 0} curtidas</span>
+        <div class="post-actions" style="display:flex; gap:16px;">
+          <button class="post-action-btn" onclick="likePost(${p.id})" style="color: ${hasLiked ? 'var(--neon-emerald)' : 'var(--text-gray)'}">
+            <svg viewBox="0 0 24 24" fill="${likeIconFill}" stroke="${likeIconColor}" stroke-width="2" style="transition:all 0.2s; transform: ${hasLiked ? 'scale(1.1)' : 'scale(1)'}"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${totalLikes}
           </button>
-          ${post.betId ? (isOpen ? `<button class="copy-bet-btn" onclick="handleBetClick(${post.betId},'${post.chosenOption || 'A'}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copiar Palpite
-          </button>` : '<span class="closed-badge">Aposta Encerrada</span>') : ''}
+          <button class="post-action-btn" onclick="openComments(${p.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            ${totalComments}
+          </button>
         </div>
       </div>
     `;
@@ -2672,4 +2769,195 @@ function openTxDetails(txId) {
   document.getElementById('tx-detail-id').textContent = `#${tx.id.toString().padStart(6, '0')}`;
   
   openModal('modal-tx-details');
+}
+
+
+// ==========================================
+// SOCIAL FEATURES (Posts, Likes, Comments)
+// ==========================================
+
+function checkAuth() {
+  if (!isLoggedIn) {
+    openAuthModal('login');
+    return false;
+  }
+  return true;
+}
+
+let currentCommentPostId = null;
+
+function openCreatePostModal() {
+  if (!checkAuth()) return;
+  
+  const betSelect = document.getElementById('create-post-bet');
+  betSelect.innerHTML = '<option value="">Nenhuma (Post simples)</option>';
+  
+  // Populate with user's recent bets (fallback to empty array if undefined)
+  const recentBets = (store.userBets || []).slice().reverse().slice(0, 10);
+  recentBets.forEach(ub => {
+    const opt = document.createElement('option');
+    opt.value = ub.id;
+    opt.textContent = ub.betTitle + ' (' + ub.chosenOptionText + ')';
+    betSelect.appendChild(opt);
+  });
+  
+  document.getElementById('create-post-text').value = '';
+  openModal('modal-create-post');
+}
+
+async function submitPost() {
+  if (!checkAuth()) return;
+  const text = document.getElementById('create-post-text').value.trim();
+  if (!text) {
+    showToast('Escreva algo para publicar!', 'error');
+    return;
+  }
+  
+  const betIdVal = document.getElementById('create-post-bet').value;
+  let linkedBet = null;
+  if (betIdVal) {
+    linkedBet = store.userBets.find(b => b.id == betIdVal);
+  }
+  
+  const newPost = {
+    username: store.profile.username,
+    user_level: store.profile.level || 1,
+    user_badge: getBadgeByLevel(store.profile.level || 1),
+    comment: text,
+    likes: 0,
+    created_at: new Date().toISOString(),
+    // Default values for DB NOT NULL constraints
+    bet_id: 0,
+    bet_title: '',
+    chosen_option: '',
+    chosen_option_text: '',
+    odds: 1
+  };
+  
+  if (linkedBet) {
+    newPost.bet_id = linkedBet.betId;
+    newPost.bet_title = linkedBet.betTitle || '';
+    newPost.chosen_option = linkedBet.chosenOption || '';
+    newPost.chosen_option_text = linkedBet.chosenOptionText || '';
+    newPost.odds = linkedBet.odds || 1;
+  }
+  
+  closeModal('modal-create-post');
+  
+  // Optimistic UI update
+  const localPost = {
+    id: Date.now(), // temporary
+    username: newPost.username,
+    userLevel: newPost.user_level,
+    userBadge: newPost.user_badge,
+    betId: newPost.bet_id,
+    betTitle: newPost.bet_title,
+    chosenOption: newPost.chosen_option,
+    chosenOptionText: newPost.chosen_option_text,
+    odds: newPost.odds,
+    comment: newPost.comment,
+    likes: 0,
+    timestamp: Date.now()
+  };
+  store.posts.unshift(localPost);
+  renderSocial();
+  showToast('Post publicado!');
+  
+  // Send to Supabase
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.from('posts').insert([newPost]).select();
+    if (!error && data && data.length > 0) {
+      localPost.id = data[0].id; // Update with real ID
+    }
+  }
+  saveStore(store);
+}
+
+async function likePost(postId) {
+  if (!checkAuth()) return;
+  const username = store.profile.username;
+  
+  if (!store.postLikes) store.postLikes = [];
+  
+  const existingLikeIndex = store.postLikes.findIndex(l => l.post_id === postId && l.username === username);
+  
+  if (existingLikeIndex > -1) {
+    // Un-like
+    store.postLikes.splice(existingLikeIndex, 1);
+    renderSocial(); // update UI instantly
+    
+    if (supabaseClient) {
+      await supabaseClient.from('post_likes').delete().eq('post_id', postId).eq('username', username);
+    }
+  } else {
+    // Like
+    store.postLikes.push({ post_id: postId, username: username });
+    renderSocial(); // update UI instantly
+    
+    if (supabaseClient) {
+      await supabaseClient.from('post_likes').insert([{ post_id: postId, username: username }]);
+    }
+  }
+  saveStore(store);
+}
+
+function openComments(postId) {
+  if (!checkAuth()) return;
+  currentCommentPostId = postId;
+  renderCommentsList();
+  openModal('modal-comments');
+}
+
+function renderCommentsList() {
+  const container = document.getElementById('comments-list');
+  if (!store.postComments) store.postComments = [];
+  
+  const comments = store.postComments.filter(c => c.post_id === currentCommentPostId);
+  
+  if (comments.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-gray);margin-top:20px;">Seja o primeiro a comentar!</div>';
+    return;
+  }
+  
+  container.innerHTML = comments.map(c => `
+    <div style="display:flex; gap:10px; padding:0 12px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--slate-gray);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--neon-emerald);flex-shrink:0;">
+        ${c.username.charAt(0).toUpperCase()}
+      </div>
+      <div style="background:var(--slate-gray); padding:10px; border-radius:var(--radius-md); border-top-left-radius:0; flex:1;">
+        <div style="font-weight:600;font-size:0.85rem;color:var(--text-white);margin-bottom:4px;">${c.username}</div>
+        <div style="font-size:0.9rem;color:var(--text-gray);">${c.text}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  // Scroll to bottom
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+async function submitComment() {
+  if (!checkAuth()) return;
+  const input = document.getElementById('new-comment-text');
+  const text = input.value.trim();
+  if (!text || !currentCommentPostId) return;
+  
+  const comment = {
+    post_id: currentCommentPostId,
+    username: store.profile.username,
+    text: text,
+    created_at: new Date().toISOString()
+  };
+  
+  // Optimistic UI
+  if (!store.postComments) store.postComments = [];
+  store.postComments.push(comment);
+  input.value = '';
+  renderCommentsList();
+  renderSocial(); // update comment count in feed
+  saveStore(store);
+  
+  // Send to Supabase
+  if (supabaseClient) {
+    await supabaseClient.from('post_comments').insert([comment]);
+  }
 }

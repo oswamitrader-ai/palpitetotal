@@ -106,13 +106,16 @@ button, a, [role="button"] {
   z-index: 100;
   background: var(--slate-dark);
   border-bottom: 1px solid rgba(148,163,184,0.08);
-  padding: 0 12px;
+  padding: 0 14px;
   padding-top: var(--safe-top);
   height: calc(52px + var(--safe-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .topbar-brand {
@@ -266,8 +269,8 @@ button, a, [role="button"] {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 100;
   background: var(--slate-dark);
   border-top: 1px solid rgba(148,163,184,0.08);
@@ -275,6 +278,8 @@ button, a, [role="button"] {
   justify-content: space-around;
   padding: 4px 0;
   padding-bottom: calc(4px + var(--safe-bottom));
+  max-width: 600px;
+  width: 100%;
 }
 
 .nav-item {
@@ -606,14 +611,20 @@ button, a, [role="button"] {
    BET CARD
    ============================================= */
 .bet-card {
-  background: var(--card-dark);
-  border-radius: 12px;
+  background: radial-gradient(circle at top right, rgba(16,185,129,0.05), transparent 60%),
+              radial-gradient(circle at bottom left, rgba(59,130,246,0.05), transparent 60%),
+              var(--card-dark);
+  border-radius: 16px;
   padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transition: var(--transition);
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
+
+.bet-card:hover { border-color: rgba(16,185,129,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05); }
 
 .bet-card:active { transform: scale(0.99); }
 
@@ -706,22 +717,28 @@ button, a, [role="button"] {
 }
 
 .odds-btn {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 14px 10px;
   cursor: pointer;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  transition: all 0.2s ease;
-  font-family: inherit;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
   min-height: var(--touch-min);
 }
 
 .odds-btn:hover {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.15);
+  background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+  border-color: var(--neon-emerald);
+  box-shadow: 0 0 15px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+  transform: translateY(-2px);
 }
 
 .odds-btn:active {
@@ -771,9 +788,12 @@ button, a, [role="button"] {
 }
 
 .odds-value {
-  color: #10B981;
-  font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: var(--gold-accent);
+  font-family: var(--font-mono);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  letter-spacing: -0.5px;
   flex-shrink: 0;
 }
 
@@ -1238,31 +1258,36 @@ button, a, [role="button"] {
 
 .post-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
 }
 
-.like-btn {
+.post-action-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 8px 12px;
-  border: none;
+  gap: 6px;
   background: transparent;
-  cursor: pointer;
+  border: none;
+  color: var(--text-gray);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 6px 12px;
   border-radius: 20px;
-  transition: var(--transition);
-  font-family: inherit;
-  min-height: 36px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
 }
 
-.like-btn:active { background: rgba(239,68,68,0.15); transform: scale(0.95); }
-.like-btn svg { width: 16px; height: 16px; color: #EF4444; }
+.post-action-btn svg {
+  width: 20px;
+  height: 20px;
+}
 
-.like-btn span {
-  font-size: 0.7rem;
-  color: var(--text-gray);
-  font-weight: 500;
+.post-action-btn:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-white);
 }
 
 .copy-bet-btn {
