@@ -34,7 +34,7 @@
         <div class="badge" id="notif-badge" style="display:none">0</div>
       </button>
       <div class="avatar-ring" id="avatar-ring" onclick="openProfile()">
-        <span id="avatar-letter">P</span>
+        <span id="avatar-letter"></span>
         <div class="level-badge" id="avatar-level">1</div>
       </div>
     </div>
@@ -164,15 +164,20 @@
         <button class="trade-tab active" id="tab-buy" onclick="setTradeMode('BUY')">Comprar</button>
         <button class="trade-tab" id="tab-sell" onclick="setTradeMode('SELL')">Vender (Cashout)</button>
       </div>
-
-      <div style="display:flex;justify-content:space-between;background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.05);">
-        <div>
-          <div style="font-size:0.65rem;color:var(--text-gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Direção / Opção</div>
-          <div id="place-bet-option" style="color:var(--text-white);font-weight:700;font-size:0.85rem;"></div>
+      <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:8px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.05);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <div style="font-size:0.65rem;color:var(--text-gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Opção Escolhida</div>
+            <div id="place-bet-option" style="color:var(--text-white);font-weight:700;font-size:0.85rem;"></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.65rem;color:var(--text-gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Probabilidade</div>
+            <div id="place-bet-prob" style="color:var(--neon-emerald);font-weight:800;font-size:0.85rem;"></div>
+          </div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:0.65rem;color:var(--text-gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Probabilidade / Preço Atual</div>
-          <div id="place-bet-odds" style="color:var(--neon-emerald);font-weight:800;font-size:0.85rem;"></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;">
+          <div style="font-size:0.7rem;color:var(--text-gray);">Preço Atual da Cota:</div>
+          <div id="place-bet-price" style="color:var(--gold-accent);font-weight:800;font-size:0.85rem;"></div>
         </div>
       </div>
 
@@ -196,9 +201,15 @@
         <button class="quick-chip allin" onclick="setPlaceBetAmountAllIn()">MAX</button>
       </div>
       
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:10px;margin:14px 0;">
-        <span style="font-size:0.8rem;color:var(--text-white);font-weight:600;">Pagamento Potencial:</span>
-        <span id="place-bet-payout" style="color:var(--neon-emerald);font-weight:800;font-size:1.1rem;">R$ 0,00</span>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:10px;margin:14px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.75rem;color:var(--text-gray);font-weight:600;" id="shares-label">Cotas Estimadas:</span>
+          <span id="place-bet-shares" style="color:var(--text-white);font-weight:700;font-size:0.9rem;">0 cotas</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(16,185,129,0.2);padding-top:8px;">
+          <span style="font-size:0.85rem;color:var(--text-white);font-weight:600;" id="payout-label">Pagamento Potencial:</span>
+          <span id="place-bet-payout" style="color:var(--neon-emerald);font-weight:800;font-size:1.1rem;">R$ 0,00</span>
+        </div>
       </div>
       
       <div class="form-error" id="place-bet-error" style="display:none"></div>
@@ -208,7 +219,6 @@
       </button>
     </div>
   </div>
-
 
   <!-- Deposit Modal -->
   <div class="modal-overlay" id="modal-deposit">
@@ -456,6 +466,6 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>

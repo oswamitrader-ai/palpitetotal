@@ -416,3 +416,49 @@ body.admin-body {
   color: #fff;
   border-color: #6366F1;
 }
+
+/* =============================================
+   STUDIO LAYOUT (CRIAÇÃO DE APOSTAS)
+   ============================================= */
+.studio-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .studio-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.studio-col-left, .studio-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.studio-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+}
+
+.studio-card:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3), inset 0 0 10px rgba(16,185,129,0.05);
+}
+
+.studio-card-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text-white);
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding-bottom: 10px;
+}
+

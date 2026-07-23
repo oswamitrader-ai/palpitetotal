@@ -1,0 +1,292 @@
+/* =============================================
+   POLYMARKET STYLE FEED (NEW)
+   ============================================= */
+
+.pm-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 8px 0 24px 0;
+}
+
+@media (max-width: 768px) {
+  .pm-feed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pm-market-card {
+  background: var(--card-dark);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.pm-market-card:hover {
+  border-color: rgba(255,255,255,0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.pm-mc-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.pm-mc-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pm-mc-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pm-mc-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-white);
+  line-height: 1.3;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pm-mc-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pm-mc-option-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pm-mc-opt-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.pm-mc-opt-btn {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-white);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 70px;
+  justify-content: space-between;
+}
+
+.pm-mc-opt-btn:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.pm-mc-opt-btn.yes { color: var(--neon-emerald); background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.2); }
+.pm-mc-opt-btn.yes:hover { background: rgba(16,185,129,0.2); }
+
+.pm-mc-opt-btn.no { color: #F87171; background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.2); }
+.pm-mc-opt-btn.no:hover { background: rgba(248,113,113,0.2); }
+
+.pm-mc-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.75rem;
+  color: var(--text-gray);
+  font-weight: 500;
+}
+
+.pm-mc-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pm-live-badge {
+  color: #F87171;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.pm-live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #F87171;
+  border-radius: 50%;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes flash-green {
+  0% { background-color: rgba(16,185,129,0.4); color: white; }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: rgba(248,113,113,0.4); color: white; }
+  100% { background-color: transparent; }
+}
+
+.flash-up { animation: flash-green 1s ease-out; }
+.flash-down { animation: flash-red 1s ease-out; }
+
+/* =============================================
+   BET DETAILS VIEW (NEW TAB)
+   ============================================= */
+.bet-details-view {
+  display: none;
+  animation: fadeIn 0.3s ease;
+  padding-bottom: 80px;
+}
+
+.bd-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.bd-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.bd-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+.bd-title-area { flex: 1; }
+.bd-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-white);
+  line-height: 1.2;
+  margin: 0 0 8px 0;
+}
+.bd-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-gray);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.bd-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .bd-layout { grid-template-columns: 1fr; }
+}
+
+.bd-main-col { display: flex; flex-direction: column; gap: 24px; }
+.bd-side-col { display: flex; flex-direction: column; gap: 16px; }
+
+.bd-chart-container {
+  background: var(--card-dark);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 350px;
+  position: relative;
+}
+
+.bd-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--card-dark);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.bd-option-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.bd-option-item:hover, .bd-option-item.selected {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--neon-emerald);
+}
+
+.bd-opt-name { font-weight: 600; font-size: 1rem; color: var(--text-white); }
+.bd-opt-price { font-weight: 700; font-size: 1.1rem; color: var(--neon-emerald); }
+
+.bd-orderbook {
+  background: var(--card-dark);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.bd-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-gray);
+  cursor: pointer;
+  margin-bottom: 16px;
+  font-weight: 600;
+  transition: color 0.2s;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.bd-back-btn:hover { color: var(--text-white); }

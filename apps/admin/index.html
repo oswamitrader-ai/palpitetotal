@@ -78,6 +78,11 @@
           <span>Soberano & Liquidação</span>
         </button>
 
+        <button class="admin-nav-item" id="nav-studio" onclick="switchAdminTab('studio')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          <span>🎙️ Estúdio de Criação</span>
+        </button>
+
         <button class="admin-nav-item" id="nav-users" onclick="switchAdminTab('users')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Gestão de Apostadores</span>
@@ -107,6 +112,155 @@
       <!-- TAB CONTENTS -->
       <main class="admin-content">
         
+        <!-- ESTÚDIO DE CRIAÇÃO TAB -->
+        <div class="admin-tab-page" id="admin-tab-studio">
+          <div class="page-title-row">
+            <div>
+              <h1 class="section-title">Estúdio de Criação (Live & Broadcast) 🎙️</h1>
+              <p class="section-subtitle">Painel de controle unificado para lançar novos palpites clássicos e gerenciar transmissões ao vivo.</p>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="switchAdminTab('soberano')">🔙 Voltar para Liquidação</button>
+          </div>
+
+          <div class="studio-layout">
+            <!-- COLUNA ESQUERDA: INFORMAÇÕES BÁSICAS -->
+            <div class="studio-col-left">
+              <div class="studio-card">
+                <h3 class="studio-card-title">1. Estrutura do Palpite</h3>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                  <div id="type-classic-btn" onclick="setAdminBetType('CLASSIC')" style="background:rgba(16,185,129,0.15);border:2px solid var(--neon-emerald);border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                    <div style="font-size:1.4rem;margin-bottom:4px;">🎯</div>
+                    <div style="font-size:0.75rem;font-weight:800;color:var(--neon-emerald);">Clássico</div>
+                    <div style="font-size:0.62rem;color:var(--text-gray);">Opção A ou B</div>
+                  </div>
+                  <div id="type-counter-btn" onclick="setAdminBetType('COUNTER')" style="background:rgba(99,102,241,0.08);border:2px solid rgba(99,102,241,0.2);border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                    <div style="font-size:1.4rem;margin-bottom:4px;">📹</div>
+                    <div style="font-size:0.75rem;font-weight:800;color:#A78BFA;">Ao Vivo (Contagem)</div>
+                    <div style="font-size:0.62rem;color:var(--text-gray);">Câmera + Vídeo</div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Título da Aposta</label>
+                  <input type="text" class="form-input" id="adm-create-title" placeholder="Ex: O Palmeiras ganha o clássico neste domingo?">
+                </div>
+          
+                <div class="form-group">
+                  <label class="form-label">Descrição & Regras Oficiais</label>
+                  <textarea class="form-textarea" id="adm-create-desc" placeholder="Critérios oficiais de resolução, regras para prorrogação, etc..." style="min-height:90px;"></textarea>
+                </div>
+          
+                <div class="form-group">
+                  <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                    Categoria
+                    <button type="button" class="btn-secondary" style="padding:2px 8px; font-size:0.7rem; width:auto; border-radius:4px;" onclick="promptNewCategory()">+ Nova</button>
+                  </label>
+                  <select class="form-select" id="adm-create-category"></select>
+                </div>
+              </div>
+
+              <!-- CONFIGURAÇÕES DE LIQUIDEZ E DATAS -->
+              <div class="studio-card">
+                <h3 class="studio-card-title">2. Liquidez e Agendamento</h3>
+                
+                <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
+                  <label class="form-label" style="display:flex;align-items:center;gap:6px;">💰 Aporte de Liquidez Real (R$)</label>
+                  <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Cria cotas iniciais Sim/Não.</div>
+                  <input type="number" class="form-input" id="adm-create-liquidity" value="100.00" min="10" step="10" style="color:var(--neon-emerald);font-weight:bold;">
+                </div>
+          
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div class="form-group">
+                    <label class="form-label">📅 Agendar Pub (Opcional)</label>
+                    <input type="datetime-local" class="form-input" id="adm-create-scheduled-for">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="color:#EF4444;">⏰ Expiração Automática</label>
+                    <input type="datetime-local" class="form-input" id="adm-create-expires-at">
+                    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
+                      <button type="button" class="crm-btn-sm" style="padding:2px 6px;font-size:0.6rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:4px;" onclick="setExpiresQuick(1)">+1h</button>
+                      <button type="button" class="crm-btn-sm" style="padding:2px 6px;font-size:0.6rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:4px;" onclick="setExpiresQuick(6)">+6h</button>
+                      <button type="button" class="crm-btn-sm" style="padding:2px 6px;font-size:0.6rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:4px;" onclick="setExpiresQuick(24)">+24h</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- COLUNA DIREITA: OPÇÕES E MÍDIA -->
+            <div class="studio-col-right">
+              
+              <!-- CAMPOS CLÁSSICOS -->
+              <div id="classic-fields" class="studio-card">
+                <h3 class="studio-card-title">3. Opções de Aposta</h3>
+                <div id="adm-create-options-container" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:14px;border-radius:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div style="font-size:0.75rem;font-weight:800;color:var(--text-white);">Resultados Possíveis</div>
+                    <button type="button" class="btn-secondary" style="padding:4px 8px;font-size:0.7rem;width:auto;" onclick="addCreateOption()">+ Adicionar</button>
+                  </div>
+                  <div id="adm-create-options-list" style="display:flex;flex-direction:column;gap:10px;">
+                    <!-- As opções dinâmicas aparecerão aqui -->
+                  </div>
+                </div>
+              </div>
+        
+              <!-- CAMPOS DE CONTAGEM / AO VIVO -->
+              <div id="counter-fields" class="studio-card" style="display:none; border-color: rgba(99,102,241,0.5);">
+                <h3 class="studio-card-title" style="color:#A78BFA;">3. Transmissão Ao Vivo & Vídeo</h3>
+                
+                <!-- IMPORTAR VÍDEO OU LINK -->
+                <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:14px;margin-bottom:14px;">
+                  <div style="font-size:0.75rem;font-weight:800;color:#A78BFA;margin-bottom:10px;">📡 Fonte de Transmissão (Escolha uma)</div>
+                  
+                  <label class="form-label">Link Stream (IP Cam, YouTube, HLS, MP4 HTTP)</label>
+                  <input type="text" class="form-input" id="adm-create-camera-url" placeholder="Ex: http://ip-cam/video.mp4" style="margin-bottom:14px;">
+                  
+                  <div style="text-align:center; color:var(--text-gray); font-size:0.7rem; margin-bottom:10px;">--- OU ---</div>
+                  
+                  <label class="form-label" style="color:var(--gold-accent);">Upload de Arquivo (MP4/WebM)</label>
+                  <div style="display:flex;gap:10px;">
+                    <input type="file" id="adm-create-video-file" accept="video/mp4,video/webm" class="form-input" style="padding:6px;">
+                  </div>
+                  <div id="adm-create-upload-status" style="font-size:0.7rem;color:var(--text-gray);margin-top:6px;">O arquivo será eviado junto com a criação da aposta.</div>
+                </div>
+
+                <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px;">
+                  <div style="font-size:0.75rem;font-weight:800;color:var(--gold-accent);margin-bottom:10px;">🎯 Meta de Contagem</div>
+                  
+                  <div class="form-group">
+                    <label class="form-label">Meta de Contagem (Alvo numérico)</label>
+                    <input type="number" class="form-input" id="adm-create-target" placeholder="Ex: 500" min="1">
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                      <label class="form-label">O que contar?</label>
+                      <select class="form-select" id="adm-create-subject">
+                        <option value="pessoas">🚶 Pessoas</option>
+                        <option value="veículos">🚗 Veículos</option>
+                        <option value="ônibus">🚌 Ônibus</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Local (Câmera)</label>
+                      <input type="text" class="form-input" id="adm-create-location" placeholder="Ex: Av. Paulista">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BOTÃO DE LANÇAMENTO FINAL -->
+              <div class="studio-card" style="background:transparent; border:none; padding:0;">
+                <button class="btn-primary" style="font-size:1.1rem; padding:18px; box-shadow: 0 4px 20px rgba(16,185,129,0.3);" onclick="confirmAdminCreateBet()">
+                  🚀 Colocar Palpite no Ar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
         <!-- DASHBOARD TAB -->
         <div class="admin-tab-page active" id="admin-tab-dash">
           <div class="page-title-row">
@@ -233,12 +387,12 @@
               <h1 class="section-title">Soberano - Liquidação de Palpites ⚖️</h1>
               <p class="section-subtitle">Defina os vencedores de apostas abertas com distribuição automática de saldo aos apostadores.</p>
             </div>
-            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="openAdminCreateBetModal()">+ Criar Novo Palpite Oficial</button>
+            <button class="btn-primary" style="width:auto;padding:8px 16px;" onclick="switchAdminTab('studio')">+ Criar Novo Palpite Oficial</button>
           </div>
 
-          <!-- Filtro Abertas / Encerradas -->
+          <!-- Filtro Abertas / Encerrados -->
           <div class="manage-toggle" style="max-width:320px;margin-bottom:16px;">
-            <button class="manage-toggle-btn active" id="adm-filter-open" onclick="setAdminBetFilter('OPEN')">Apostas Abertas (<span id="adm-open-count">0</span>)</button>
+            <button class="manage-toggle-btn active" id="adm-filter-open" onclick="setAdminBetFilter('OPEN')">Eventos Abertos (<span id="adm-open-count">0</span>)</button>
             <button class="manage-toggle-btn" id="adm-filter-scheduled" onclick="setAdminBetFilter('SCHEDULED')">Agendadas (<span id="adm-scheduled-count">0</span>)</button>
             <button class="manage-toggle-btn" id="adm-filter-closed" onclick="setAdminBetFilter('CLOSED')">Resolvidas (<span id="adm-closed-count">0</span>)</button>
           </div>
@@ -345,125 +499,6 @@
     </div>
   </div>
 
-  <!-- Modal para Criar Aposta Oficial pelo Admin -->
-  <div class="modal-overlay" id="modal-admin-create-bet">
-    <div class="modal-card" style="max-width:520px;">
-      <div class="modal-header">
-        <span class="modal-title">🎲 Lançar Novo Palpite</span>
-        <button class="modal-close" onclick="closeModal('modal-admin-create-bet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
-
-      <!-- Seletor de tipo de aposta -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-        <div id="type-classic-btn" onclick="setAdminBetType('CLASSIC')" style="background:rgba(16,185,129,0.15);border:2px solid var(--neon-emerald);border-radius:12px;padding:12px;text-align:center;cursor:pointer;">
-          <div style="font-size:1.4rem;margin-bottom:4px;">🎯</div>
-          <div style="font-size:0.75rem;font-weight:800;color:var(--neon-emerald);">Clássico</div>
-          <div style="font-size:0.62rem;color:var(--text-gray);">Opção A ou B</div>
-        </div>
-        <div id="type-counter-btn" onclick="setAdminBetType('COUNTER')" style="background:rgba(99,102,241,0.08);border:2px solid rgba(99,102,241,0.2);border-radius:12px;padding:12px;text-align:center;cursor:pointer;">
-          <div style="font-size:1.4rem;margin-bottom:4px;">📹</div>
-          <div style="font-size:0.75rem;font-weight:800;color:#A78BFA;">Contagem Ao Vivo</div>
-          <div style="font-size:0.62rem;color:var(--text-gray);">Câmera + Contador</div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Título da Aposta</label>
-        <input type="text" class="form-input" id="adm-create-title" placeholder="Ex: Quantos veículos passarão na Av. Paulista até às 18h?">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Descrição & Regras</label>
-        <textarea class="form-textarea" id="adm-create-desc" placeholder="Critérios oficiais de resolução..."></textarea>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
-          Categoria
-          <button type="button" class="btn-secondary" style="padding:2px 8px; font-size:0.7rem; width:auto; border-radius:4px;" onclick="promptNewCategory()">+ Nova</button>
-        </label>
-        <select class="form-select" id="adm-create-category">
-          <!-- As categorias serão populadas dinamicamente pelo app -->
-        </select>
-      </div>
-
-      <!-- CAMPOS CLÁSSICOS -->
-      <div id="classic-fields">
-      <!-- OPÇÕES DINÂMICAS -->
-      <div id="adm-create-options-container" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:14px;border-radius:12px;margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <div style="font-size:0.7rem;font-weight:800;color:var(--text-white);letter-spacing:1px;text-transform:uppercase;">📊 Opções de Resultado</div>
-          <button type="button" class="btn-secondary" style="padding:4px 8px;font-size:0.7rem;width:auto;" onclick="addCreateOption()">+ Adicionar Opção</button>
-        </div>
-        <div id="adm-create-options-list" style="display:flex;flex-direction:column;gap:10px;">
-          <!-- As opções dinâmicas aparecerão aqui -->
-        </div>
-      </div>
-      </div>
-
-      <!-- CAMPOS DE CONTAGEM -->
-      <div id="counter-fields" style="display:none;">
-        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:14px;margin-bottom:14px;">
-          <div style="font-size:0.7rem;font-weight:800;color:#A78BFA;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">📹 Configuração da Câmera</div>
-          <div class="form-group">
-            <label class="form-label">Local / Endereço</label>
-            <input type="text" class="form-input" id="adm-create-location" placeholder="Ex: Av. Paulista, 1000 — Sentido Consolação">
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="form-group">
-              <label class="form-label">O que contar?</label>
-              <select class="form-select" id="adm-create-subject">
-                <option value="pessoas">🚶 Pessoas</option>
-                <option value="veículos">🚗 Veículos</option>
-                <option value="ônibus">🚌 Ônibus</option>
-                <option value="motos">🏍️ Motos</option>
-                <option value="bicicletas">🚲 Bicicletas</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">ID da Câmera</label>
-              <input type="text" class="form-input" id="adm-create-camera-label" placeholder="Ex: CAM-SP-001">
-            </div>
-          </div>
-        </div>
-
-        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px;margin-bottom:14px;">
-          <div style="font-size:0.7rem;font-weight:800;color:var(--gold-accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">🎯 Meta e Apostas</div>
-          <div class="form-group">
-            <label class="form-label">Meta de Contagem (número alvo)</label>
-            <input type="number" class="form-input" id="adm-create-target" placeholder="Ex: 500" min="1">
-          </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
-        <label class="form-label" style="display:flex;align-items:center;gap:6px;">💰 Aporte de Liquidez Real (R$)</label>
-        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Este valor será descontado da sua conta de Administrador para comprar cotas iniciais do Sim e do Não, garantindo que o mercado inicie com 50% de probabilidade.</div>
-        <input type="number" class="form-input" id="adm-create-liquidity" value="100.00" min="10" step="10" style="color:var(--neon-emerald);font-weight:bold;">
-      </div>
-
-      <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:12px;margin-bottom:16px;">
-        <label class="form-label" style="display:flex;align-items:center;gap:6px;">📅 Agendar Publicação <span style="font-size:0.6rem;background:var(--slate-dark);padding:2px 6px;border-radius:4px;color:var(--text-gray);">Opcional</span></label>
-        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Se preenchido, a aposta será publicada automaticamente pelo sistema apenas no dia e horário escolhido.</div>
-        <input type="datetime-local" class="form-input" id="adm-create-scheduled-for">
-      </div>
-      <div class="form-group" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:12px;border-radius:12px;margin-bottom:16px;">
-        <label class="form-label" style="display:flex;align-items:center;gap:6px;">⏰ Expiração Automática <span style="font-size:0.6rem;background:var(--slate-dark);padding:2px 6px;border-radius:4px;color:var(--text-gray);">Recomendado</span></label>
-        <div style="font-size:0.65rem;color:var(--text-gray);margin-bottom:8px;">Quando o prazo vencer, a aposta será encerrada automaticamente. Se nenhum dos lados atingiu a condição, o Admin poderá resolver manualmente após o encerramento.</div>
-        <input type="datetime-local" class="form-input" id="adm-create-expires-at">
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(1)">+1 hora</button>
-          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(3)">+3 horas</button>
-          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(6)">+6 horas</button>
-          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(12)">+12 horas</button>
-          <button type="button" class="crm-btn-sm" style="padding:4px 10px;font-size:0.65rem;background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;" onclick="setExpiresQuick(24)">+24 horas</button>
-        </div>
-      </div>
-
-      <button class="btn-primary" onclick="confirmAdminCreateBet()">🚀 Lançar Aposta Oficial</button>
-    </div>
-  </div>
 
   <!-- Modal para Editar Aposta e Ajustar Odds em Andamento -->
   <div class="modal-overlay" id="modal-admin-edit-bet">

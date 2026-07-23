@@ -231,7 +231,11 @@ function switchAdminTab(tab) {
   document.querySelectorAll('.admin-tab-page').forEach(el => el.classList.remove('active'));
   document.getElementById('admin-tab-' + tab).classList.add('active');
 
-  renderAdminCurrentTab();
+  if (tab === 'studio') {
+    initAdminStudio();
+  } else {
+    renderAdminCurrentTab();
+  }
 }
 
 // ---- CATEGORIAS DINÂMICAS ----
@@ -532,6 +536,7 @@ function renderAdminSoberanoView() {
               <span class="cat-badge ${catClass}">${b.category}</span>
               ${isCounter ? '<span style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);padding:2px 8px;border-radius:20px;font-size:0.6rem;font-weight:800;color:#A78BFA;">📹 CONTADOR</span>' : ''}
               <button class="crm-btn-sm" style="padding:3px 10px;color:var(--neon-emerald);" onclick="openAdminEditBetModal(${b.id})">✏️ Editar</button>
+              <button class="crm-btn-sm" style="padding:3px 10px;color:#EF4444;background:rgba(239,68,68,0.15);border:none;border-radius:6px;font-weight:700;cursor:pointer;" onclick="deleteAdminBet(${b.id}, '${b.title.replace(/'/g, "\\'")}')">🗑️ Excluir</button>
             </div>
             <span class="pool-text">Pool: ${formatMoney(Number(b.total_pool))}</span>
           </div>
@@ -617,19 +622,13 @@ async function republishAdminBet(betId) {
   const liquidity = parseFloat(liqStr);
   if (isNaN(liquidity) || liquidity <= 0) return;
 
-  const pA = liquidity / 2;
-  const pB = liquidity / 2;
+  const numOptions = b.options && b.options.length > 0 ? b.options.length : 2;
+  const poolPerOption = liquidity / numOptions;
 
   const newBet = {
     title: b.title,
     description: b.description,
     category: b.category,
-    option_a: b.option_a,
-    option_b: b.option_b,
-    odds_a: 1.90,
-    odds_b: 1.90,
-    pool_a: pA,
-    pool_b: pB,
     status: 'OPEN',
     total_pool: liquidity,
     bet_type: b.bet_type,
@@ -653,19 +652,38 @@ async function republishAdminBet(betId) {
     if (newBetData && newBetData.length > 0) {
       const newBetId = newBetData[0].id;
       
+      // Criar as opções na nova aposta baseadas nas antigas
+      if (b.options && b.options.length > 0) {
+        for (const opt of b.options) {
+          await supabaseClient.from('bet_options').insert({
+            bet_id: newBetId,
+            option_label: opt.option_label,
+            title: opt.title,
+            pool: poolPerOption,
+            current_odds: 100 / (100 / numOptions) // Ex: 50% = 2.0 odds
+          });
+
+          await supabaseClient.from('bet_history').insert({
+            bet_id: newBetId,
+            option_label: opt.option_label,
+            odds: 100 / (100 / numOptions)
+          });
+
+          await supabaseClient.from('user_portfolios').insert({
+            bet_id: newBetId,
+            user_id: 'admin_user',
+            option_label: opt.option_label,
+            shares: poolPerOption,
+            username: 'admin_user'
+          });
+        }
+      }
+
       // Admin atua como Liquidity Provider
       await supabaseClient.from('transactions').insert({
          amount: -liquidity,
          description: `Provisão de Liquidez (Republicado): ${b.title}`,
          type: 'LIQUIDITY_ADD',
-         username: 'admin_user'
-      });
-      
-      await supabaseClient.from('user_portfolios').insert({
-         bet_id: newBetId,
-         user_id: 'admin_user',
-         shares_a: pA,
-         shares_b: pB,
          username: 'admin_user'
       });
     }
@@ -873,11 +891,15 @@ function setExpiresQuick(hours) {
   document.getElementById('adm-create-expires-at').value = local;
 }
 
-function openAdminCreateBetModal() {
+function initAdminStudio() {
   currentCreateBetType = 'CLASSIC';
   document.getElementById('adm-create-title').value = '';
   document.getElementById('adm-create-desc').value = '';
   document.getElementById('adm-create-liquidity').value = '100.00';
+  document.getElementById('adm-create-camera-url').value = '';
+  document.getElementById('adm-create-video-file').value = '';
+  document.getElementById('adm-create-upload-status').textContent = 'O arquivo será enviado junto com a criação da aposta.';
+  
   if (document.getElementById('adm-create-expires-at')) document.getElementById('adm-create-expires-at').value = '';
   if (document.getElementById('adm-create-scheduled-for')) document.getElementById('adm-create-scheduled-for').value = '';
   
@@ -890,7 +912,7 @@ function openAdminCreateBetModal() {
 
   // Reset tipo
   setAdminBetType('CLASSIC');
-  openModal('modal-admin-create-bet');
+  renderAdminCategories();
 }
 
 // ---- FUNÇÃO PARA ADICIONAR OPÇÃO DINÂMICA ----
@@ -997,12 +1019,53 @@ async function confirmAdminCreateBet() {
     payload.count_max = target;
   }
 
+    // Verificação de Câmera/Vídeo (Se for Ao Vivo)
+    let videoUrl = '';
+    if (currentCreateBetType === 'COUNTER') {
+      const urlInput = document.getElementById('adm-create-camera-url').value.trim();
+      const fileInput = document.getElementById('adm-create-video-file');
+      const file = fileInput?.files?.[0];
+      const statusText = document.getElementById('adm-create-upload-status');
+
+      if (file) {
+        if (statusText) statusText.textContent = '⏳ Fazendo upload do vídeo... aguarde.';
+        const ext = file.name.split('.').pop() || 'mp4';
+        const fileName = `bet_${Date.now()}.${ext}`;
+        
+        const { data: uploadData, error: uploadErr } = await supabaseClient
+          .storage
+          .from('videos')
+          .upload(fileName, file, { upsert: true, contentType: file.type || 'video/mp4' });
+          
+        if (!uploadErr && uploadData) {
+          const { data: publicUrlData } = supabaseClient.storage.from('videos').getPublicUrl(fileName);
+          videoUrl = publicUrlData?.publicUrl || '';
+        }
+
+        if (!videoUrl) {
+          videoUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+          });
+        }
+      } else if (urlInput) {
+        videoUrl = urlInput;
+      }
+      
+      if (videoUrl) {
+        payload.camera_url = videoUrl;
+      }
+    }
+
   try {
     const { data: newBetData, error } = await supabaseClient.from('bets').insert(payload).select();
     if (error) throw error;
     
     if (newBetData && newBetData.length > 0) {
       const newBetId = newBetData[0].id;
+      
+      // Se tivermos videoUrl base64, nós já salvamos no insert, mas pode ser redundante atualizar.
       
       // Inserir as opções dinâmicas
       for (const opt of dynamicOptions) {
@@ -1039,9 +1102,9 @@ async function confirmAdminCreateBet() {
       });
     }
 
-    closeModal('modal-admin-create-bet');
     showSnackbar(`✅ ${currentCreateBetType === 'COUNTER' ? '📹 Palpite de Contagem' : '🎯 Aposta clássica'} lançada com Liquidez Real!`);
     loadAdminData();
+    switchAdminTab('soberano');
   } catch (err) {
     console.error('Erro ao criar aposta:', err);
     showSnackbar('Erro ao criar aposta: ' + (err.message || ''));

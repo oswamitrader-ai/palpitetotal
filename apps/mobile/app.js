@@ -13,6 +13,10 @@ if (window.supabase && window.supabase.createClient) {
 // ---- AUTHENTICATION STATE ----
 let isLoggedIn = localStorage.getItem('palpitetotal_logged_in') === 'true';
 let loggedInUser = localStorage.getItem('palpitetotal_username') || '';
+if (loggedInUser === 'PalpiteiroMestre') {
+  loggedInUser = '';
+  localStorage.removeItem('palpitetotal_username');
+}
 
 // ---- DATA STORE (localStorage + Supabase backed) ----
 const STORE_KEY = 'palpitetotal_data_v2';
@@ -135,6 +139,30 @@ async function syncFromSupabase() {
       store.userBets = [];
     }
 
+    // Fetch new AMM Orders and map them to userBets (Pending)
+    const { data: dbOrders } = await supabaseClient.from('orders').select('*').eq('user_id', store.profile.username).eq('status', 'OPEN');
+    if (dbOrders && dbOrders.length > 0) {
+      dbOrders.forEach(order => {
+        const bet = store.bets.find(b => Number(b.id) === Number(order.bet_id));
+        if (!bet || bet.status !== 'OPEN') return; // Ignore open orders on resolved markets
+        const opt = bet.options ? bet.options.find(o => o.option_label === order.option) : null;
+        if (!store.userBets.find(u => u.id === order.id + 1000000)) {
+           store.userBets.push({
+             id: order.id + 1000000,
+             betId: bet.id,
+             betTitle: bet.title,
+             chosenOption: order.option,
+             chosenOptionText: opt ? opt.title : order.option,
+             amount: Math.round(order.price * order.shares_total),
+             odds: order.price > 0 ? (1 / order.price) : 1,
+             potentialWin: Math.round(order.shares_total),
+             status: 'PENDING',
+             createdAt: new Date(order.created_at).getTime()
+           });
+        }
+      });
+    }
+
     const { data: dbPortfolios } = await supabaseClient.from('user_portfolios').select('*').eq('username', store.profile.username).order('id', { ascending: true });
     if (dbPortfolios && dbPortfolios.length > 0) {
       store.portfolios = dbPortfolios.map(p => ({
@@ -143,8 +171,6 @@ async function syncFromSupabase() {
         option_label: p.option_label,
         shares: Number(p.shares)
       }));
-    } else {
-      store.portfolios = [];
     }
 
     const { data: dbTx } = await supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true });
@@ -207,7 +233,10 @@ async function syncFromSupabase() {
 const lastCamFrameStore = {};
 
 // ---- SUPABASE REALTIME — TEMPO REAL ----
+let realtimeSubscribed = false;
 function initRealtimeSubscriptions() {
+  if (realtimeSubscribed) return;
+  realtimeSubscribed = true;
   if (!supabaseClient) return;
 
   // Canal único para todas as tabelas relevantes
@@ -424,13 +453,19 @@ function initRealtimeSubscriptions() {
 }
 
 function setAppVisibility(visible) {
-  const main = document.querySelector('main.content-area');
+  const main = document.querySelector('.main-content');
+  const topbar = document.querySelector('.topbar');
   const nav = document.querySelector('.bottom-nav');
   if (main) main.style.display = visible ? 'block' : 'none';
+  if (topbar) topbar.style.display = visible ? 'flex' : 'none';
   if (nav) nav.style.display = visible ? 'flex' : 'none';
 }
 
 async function initApp() {
+  if (loggedInUser) {
+    const avatarLetter = document.getElementById('avatar-letter');
+    if (avatarLetter) avatarLetter.textContent = loggedInUser.charAt(0).toUpperCase();
+  }
   if (!isLoggedIn) {
     setAppVisibility(false);
     openAuthModal('login');
@@ -441,11 +476,13 @@ async function initApp() {
     return;
   }
   
-  setAppVisibility(true);
+    setAppVisibility(true);
+  switchTab('feed');
+  renderCurrentTab(); // Show local cached data immediately!
+  
   await syncFromSupabase();
   initRealtimeSubscriptions();
-  switchTab('feed');
-  renderCurrentTab();
+  renderCurrentTab(); // Re-render with fresh data from cloud
 }
 
 // Inicializa a aplicação (movido para o final do arquivo)
@@ -1169,7 +1206,11 @@ function openPlaceBet(bet, option) {
 
   document.getElementById('place-bet-title').textContent = bet.title;
   document.getElementById('place-bet-option').textContent = optText;
-  document.getElementById('place-bet-odds').textContent = `${Math.round(probPerc)}% (Preço Atual: ${currentPrice.toFixed(2)}¢)`;
+  const probEl = document.getElementById('place-bet-prob');
+  if (probEl) probEl.textContent = `${Math.round(probPerc)}%`;
+  
+  const priceEl = document.getElementById('place-bet-price');
+  if (priceEl) priceEl.textContent = `${currentPrice.toFixed(2)}¢`;
   document.getElementById('place-bet-balance').textContent = formatMoney(getBalance());
   document.getElementById('place-bet-amount').value = '';
   document.getElementById('place-bet-payout').textContent = '0 Cotas';
@@ -1201,12 +1242,21 @@ function updatePayout() {
   const poolTot = parseFloat(bet.totalPool) || 0;
   const prob = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : (1 / (bet.options ? bet.options.length : 2));
   
+  const sharesEl = document.getElementById('place-bet-shares');
+  const sharesLabelEl = document.getElementById('shares-label');
+  const payoutLabel = document.getElementById('payout-label');
+
   if (tradeMode === 'BUY') {
-    const shares = Math.floor(amount / prob);
-    // Cada cota vencedora paga exatamente R$ 1,00. Logo, o número de cotas = Prêmio em Reais!
+    const shares = amount / prob;
+    if (sharesEl) sharesEl.textContent = `${shares.toFixed(2).replace('.', ',')} cotas`;
+    if (sharesLabelEl) sharesLabelEl.textContent = 'Cotas Estimadas:';
+    if (payoutLabel) payoutLabel.textContent = 'Pagamento Potencial:';
     document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(shares)}`;
   } else {
     const cash = amount * prob;
+    if (sharesEl) sharesEl.textContent = `${amount.toFixed(2).replace('.', ',')} cotas`;
+    if (sharesLabelEl) sharesLabelEl.textContent = 'Cotas a Vender:';
+    if (payoutLabel) payoutLabel.textContent = 'Cashout (Valor de Venda):';
     document.getElementById('place-bet-payout').textContent = `~ ${formatMoney(cash)}`;
   }
 
@@ -1243,7 +1293,7 @@ function confirmPlaceBet() {
 
   let shares = 0;
   if (tradeMode === 'BUY') {
-    shares = Math.floor(amount / prob);
+    shares = amount / prob;
   } else {
     shares = amount; // user types shares to sell
     if (shares > ownedShares) {
@@ -1492,98 +1542,53 @@ function likePost(postId) {
 function renderMyBets() {
   const totalInvested = store.userBets.reduce((s, ub) => s + ub.amount, 0);
   const totalWon = store.userBets.filter(ub => ub.status === 'WON').reduce((s, ub) => s + ub.potentialWin, 0);
-  const activePositions = store.portfolios.filter(p => p.sharesA > 0 || p.sharesB > 0);
+  const matchedPositions = store.portfolios.filter(p => p.shares > 0).length;
+  const pendingPositions = store.userBets.filter(ub => ub.status === 'PENDING').length;
+  const activeCount = matchedPositions + pendingPositions;
 
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Aplicado</div><div class="stat-value">${formatMoney(totalInvested)}</div></div>
     <div class="stat-card"><div class="stat-label">Retorno Ganho</div><div class="stat-value green">${formatMoney(totalWon)}</div></div>
-    <div class="stat-card"><div class="stat-label">Posições Ativas</div><div class="stat-value gold">${activePositions.length} ativas</div></div>
+    <div class="stat-card"><div class="stat-label">Posições Ativas</div><div class="stat-value gold">${activeCount} ativas</div></div>
   `;
 
   const list = document.getElementById('my-bets-list');
   let html = '';
 
-  if (activePositions.length > 0) {
-    html += `<h3 style="color:var(--text-white); margin-bottom:12px; display:flex; align-items:center; gap:8px;"><div class="camera-status-dot live" style="display:block;"></div> Minhas Cotas (Cashout)</h3>`;
-    
-    activePositions.forEach(p => {
-      const bet = store.bets.find(b => b.id === p.betId);
-      if (!bet) return;
-      
-      if (p.sharesA > 0) {
-        const probA = bet.poolA / bet.totalPool;
-        const cashoutValueA = p.sharesA * probA;
-        
-        html += `
-          <div class="user-bet-card" style="border: 1px solid var(--neon-emerald); background: rgba(16,185,129,0.05); cursor:pointer;" onclick="openBetDetails(${bet.id})">
-            <div class="user-bet-header">
-              <span class="user-bet-title">${bet.title}</span>
-              <span class="status-badge" style="background:var(--neon-emerald);color:#000;">POSIÇÃO ATIVA</span>
-            </div>
-            <div class="user-bet-details">
-              <div class="detail-col">
-                <div class="detail-label">Sua Opção</div>
-                <div class="detail-value" style="color:var(--text-white);font-weight:700;">${bet.optionA}</div>
-              </div>
-              <div class="detail-col">
-                <div class="detail-label">Cotas Possuídas</div>
-                <div class="detail-value" style="color:var(--gold-accent);font-weight:700;">${p.sharesA} Cotas</div>
-              </div>
-              <div class="detail-col">
-                <div class="detail-label">Valor P/ Cashout</div>
-                <div class="detail-value" style="color:var(--neon-emerald);font-weight:800;">${formatMoney(cashoutValueA)}</div>
-              </div>
-            </div>
-            <div class="user-bet-footer" style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); margin-top:10px;">
-              <span style="font-size:0.75rem; color:var(--text-gray);">Preço atual da cota: ${formatMoney(probA)}</span>
-              <span style="font-size:0.75rem; color:var(--neon-emerald); font-weight:700;">Clique para abrir e Vender</span>
-            </div>
-          </div>
-        `;
-      }
-      
-      if (p.sharesB > 0) {
-        const probB = bet.poolB / bet.totalPool;
-        const cashoutValueB = p.sharesB * probB;
-        
-        html += `
-          <div class="user-bet-card" style="border: 1px solid #EF4444; background: rgba(239,68,68,0.05); cursor:pointer;" onclick="openBetDetails(${bet.id})">
-            <div class="user-bet-header">
-              <span class="user-bet-title">${bet.title}</span>
-              <span class="status-badge" style="background:#EF4444;color:#FFF;">POSIÇÃO ATIVA</span>
-            </div>
-            <div class="user-bet-details">
-              <div class="detail-col">
-                <div class="detail-label">Sua Opção</div>
-                <div class="detail-value" style="color:var(--text-white);font-weight:700;">${bet.optionB}</div>
-              </div>
-              <div class="detail-col">
-                <div class="detail-label">Cotas Possuídas</div>
-                <div class="detail-value" style="color:var(--gold-accent);font-weight:700;">${p.sharesB} Cotas</div>
-              </div>
-              <div class="detail-col">
-                <div class="detail-label">Valor P/ Cashout</div>
-                <div class="detail-value" style="color:var(--neon-emerald);font-weight:800;">${formatMoney(cashoutValueB)}</div>
-              </div>
-            </div>
-            <div class="user-bet-footer" style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); margin-top:10px;">
-              <span style="font-size:0.75rem; color:var(--text-gray);">Preço atual da cota: ${formatMoney(probB)}</span>
-              <span style="font-size:0.75rem; color:#EF4444; font-weight:700;">Clique para abrir e Vender</span>
-            </div>
-          </div>
-        `;
-      }
-    });
-  }
-
-  const closedBets = store.userBets.filter(ub => ub.status !== 'PENDING').sort((a,b) => b.createdAt - a.createdAt);
-  if (closedBets.length > 0) {
-    html += `<h3 style="color:var(--text-gray); margin-top:24px; margin-bottom:12px;">Histórico de Transações</h3>`;
-    html += closedBets.map(ub => {
-       const statusClass = ub.status === 'WON' ? 'won' : 'lost';
-       const statusText = ub.status === 'WON' ? 'Ganhou' : 'Perdeu';
+  const allBets = store.userBets.sort((a,b) => b.createdAt - a.createdAt);
+  if (allBets.length > 0) {
+    html += `<h3 style="color:var(--text-gray); margin-top:24px; margin-bottom:12px;">Meus Palpites</h3>`;
+    html += allBets.map(ub => {
+       const statusClass = ub.status === 'WON' ? 'won' : (ub.status === 'PENDING' ? 'pending' : 'lost');
+       const statusText = ub.status === 'WON' ? 'Ganhou' : (ub.status === 'PENDING' ? 'Pendente' : 'Perdeu');
+       
+       // Calculate dynamic info
+       let currentProb = 0;
+       let shares = 0;
+       let cashoutValue = 0;
+       const betData = store.bets.find(b => Number(b.id) === Number(ub.betId));
+       
+       if (betData && betData.options) {
+         const pf = store.portfolios.find(p => Number(p.bet_id) === Number(ub.betId) && p.option_label === ub.chosenOption);
+         shares = pf ? parseFloat(pf.shares || 0) : (ub.potentialWin || 0);
+         
+         const betOpt = betData.options.find(o => o.option_label === ub.chosenOption);
+         const poolOpt = betOpt ? parseFloat(betOpt.pool) || 0 : 0;
+         const poolTot = parseFloat(betData.totalPool) || 0;
+         currentProb = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : 0;
+         cashoutValue = shares * currentProb;
+       }
+       
+       const profitLoss = cashoutValue - ub.amount;
+       const plSign = profitLoss >= 0 ? '+' : '';
+       const plColor = profitLoss > 0 ? 'var(--neon-emerald)' : (profitLoss < 0 ? 'var(--neon-orange)' : 'var(--text-gray)');
+       
+       // For completed bets, show fixed potential win instead of dynamic cashout
+       const finalReturn = ub.status === 'PENDING' ? cashoutValue : ub.potentialWin;
+       const isPending = ub.status === 'PENDING';
+       
        return `
-          <div class="user-bet-card">
+          <div class="user-bet-card" ${isPending && betData ? `onclick="openPlaceBetById(${ub.betId}, '${ub.chosenOption}')" style="cursor:pointer;"` : ''}>
             <div class="user-bet-header">
               <span class="user-bet-title">${ub.betTitle}</span>
               <span class="status-badge ${statusClass}">${statusText}</span>
@@ -1592,16 +1597,33 @@ function renderMyBets() {
               <div class="detail-col">
                 <div class="detail-label">Opção Escolhida</div>
                 <div class="detail-value">${ub.chosenOptionText}</div>
+                ${isPending && shares > 0 ? `<div style="font-size:0.7rem;color:var(--text-gray);margin-top:2px;">${shares.toFixed(2).replace('.', ',')} cotas</div>` : ''}
               </div>
               <div class="detail-col">
                 <div class="detail-label">Apostado</div>
                 <div class="detail-value">${formatMoney(ub.amount)}</div>
               </div>
               <div class="detail-col">
-                <div class="detail-label">Retorno Est.</div>
-                <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : 'var(--text-white)'}">${formatMoney(ub.potentialWin)}</div>
+                <div class="detail-label">${isPending ? 'Cashout Atual' : 'Retorno'}</div>
+                <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : (isPending ? 'var(--gold-accent)' : 'var(--text-white)')}">
+                   ${formatMoney(finalReturn)}
+                </div>
+                ${isPending && shares > 0 ? `
+                  <div style="font-size:0.7rem;color:${plColor};margin-top:2px;font-weight:600;">
+                     ${plSign}${formatMoney(profitLoss)}
+                  </div>` : ''
+                }
               </div>
             </div>
+            ${isPending ? `
+            <div style="font-size:0.75rem; color:var(--text-gray); margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+               <span><strong>Data:</strong> ${new Date(ub.createdAt).toLocaleString('pt-BR')}</span>
+               <span style="color:var(--neon-blue);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;vertical-align:middle;"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Negociar</span>
+            </div>
+            ` : `
+            <div style="font-size:0.75rem; color:var(--text-gray); margin-top:8px;">
+               <strong>Data:</strong> ${new Date(ub.createdAt).toLocaleString('pt-BR')}
+            </div>`}
           </div>
        `;
     }).join('');
@@ -1648,7 +1670,6 @@ function confirmShare() {
   renderCurrentTab();
 }
 
-// ---- WALLET TAB ----
 function renderWallet() {
   document.getElementById('wallet-balance').textContent = formatMoney(getBalance());
 
@@ -2062,7 +2083,8 @@ function openModal(id) {
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
 }
 
 // Close modals on overlay click
@@ -2570,3 +2592,10 @@ function renderCRMBetsTable() {
 // =============================================
 initApp();
 
+
+function openPlaceBetById(betId, optionLabel) {
+  const bet = store.bets.find(b => Number(b.id) === Number(betId));
+  if (bet) {
+    openPlaceBet(bet, optionLabel);
+  }
+}
