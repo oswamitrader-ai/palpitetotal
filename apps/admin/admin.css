@@ -418,7 +418,7 @@ body.admin-body {
 }
 
 /* =============================================
-   STUDIO LAYOUT (CRIAÇÃO DE APOSTAS)
+   STUDIO LAYOUT (CRIAï¿½ï¿½O DE APOSTAS)
    ============================================= */
 .studio-layout {
   display: grid;
@@ -462,3 +462,28 @@ body.admin-body {
   padding-bottom: 10px;
 }
 
+
+/* Extra Metrics Dashboard */
+.adm-metric-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.adm-metric-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.adm-metric-label {
+  font-size: 0.7rem;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.adm-metric-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+}

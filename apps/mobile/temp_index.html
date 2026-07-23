@@ -345,8 +345,58 @@
   </div>
 
   <!-- Profile Modal -->
-    
-<div class="modal-overlay" id="modal-notifications">
+    <div class="bottom-sheet-overlay" id="sheet-profile" onclick="closeSheet(event, 'sheet-profile')">
+    <div class="bottom-sheet-card">
+      <div class="bottom-sheet-handle"></div>
+      <div class="bottom-sheet-header">
+        <span class="bottom-sheet-title">Meu Perfil</span>
+      </div>
+      <div class="bottom-sheet-content">
+        <div class="profile-header" style="margin-bottom:20px;">
+          <div class="profile-avatar-large" id="profile-avatar-large">P</div>
+          <div class="profile-username" id="profile-username" style="margin-top:8px;"></div>
+          <div class="profile-frame" id="profile-frame">Moldura Bronze</div>
+        </div>
+        <div class="xp-bar-container" style="margin-bottom:20px;">
+          <div class="xp-bar-label">
+            <span id="xp-label">XP: 0 / 200</span>
+            <span id="level-label">Nível 1</span>
+          </div>
+          <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <button class="btn-primary" style="font-size:0.85rem;padding:12px;" onclick="closeSheet('sheet-profile');openDeposit()">Depositar</button>
+          <button class="btn-secondary" style="font-size:0.85rem;padding:12px;" onclick="closeSheet('sheet-profile');openWithdraw()">Sacar</button>
+        </div>
+        <button class="btn-secondary" onclick="closeSheet('sheet-profile');referFriend()" style="margin-bottom:16px;">
+          🔗 Indicar Amigo (+300 XP)
+        </button>
+        <button class="btn-secondary" onclick="confirmLogout()" style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;">
+          🚪 Deslogar da Conta
+        </button>
+      </div>
+    </div>
+  </div>
+      <div style="margin-bottom:16px;">
+        <div class="form-label">Áreas de Interesse</div>
+        <div class="interests-grid" id="interests-grid"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <button class="btn-primary" style="font-size:0.75rem;" onclick="closeModal('modal-profile');openDeposit()">Depositar</button>
+        <button class="btn-secondary" style="font-size:0.75rem;" onclick="closeModal('modal-profile');openWithdraw()">Sacar</button>
+      </div>
+      <button class="btn-secondary" onclick="referFriend()" style="margin-top:6px;">
+        🔗 Indicar Amigo (+300 XP)
+      </button>
+      <button class="btn-secondary" onclick="confirmLogout()" style="margin-top:10px;background:rgba(239,68,68,0.15);color:#EF4444;border-color:rgba(239,68,68,0.3);">
+        🚪 Sair da Conta (Logout)
+      </button>
+    </div>
+  </div>
+
+  <!-- Notifications Modal -->
+  <div class="modal-overlay" id="modal-notifications">
     <div class="modal-card">
       <div class="modal-header">
         <span class="modal-title">🔔 Notificações</span>
@@ -431,7 +481,7 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="app.js?v=47"></script>
+  <script src="app.js?v=43"></script>
 
   <!-- TX Details Bottom Sheet -->
   <div class="modal-overlay" id="modal-tx-details">
@@ -477,42 +527,5 @@
     </div>
   </div>
 
-
-  <!-- Profile Bottom Sheet -->
-  <div class="modal-overlay" id="modal-profile">
-    <div class="bottom-sheet">
-      <div class="bottom-sheet-drag"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <span class="bottom-sheet-title" style="font-size:1.25rem;font-weight:700;color:var(--text-white);">Meu Perfil</span>
-        <button class="modal-close" onclick="closeModal('modal-profile')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      
-      <div class="profile-header" style="margin-bottom:20px;">
-        <div class="profile-avatar-large" id="profile-avatar-large">P</div>
-        <div class="profile-username" id="profile-username" style="margin-top:8px;"></div>
-        <div class="profile-frame" id="profile-frame">Moldura Bronze</div>
-      </div>
-      <div class="xp-bar-container" style="margin-bottom:20px;">
-        <div class="xp-bar-label">
-          <span id="xp-label">XP: 0 / 200</span>
-          <span id="level-label">Nível 1</span>
-        </div>
-        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
-      </div>
-      
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-        <button class="btn-primary" style="font-size:0.85rem;padding:12px;" onclick="closeModal('modal-profile');openDeposit()">Depositar</button>
-        <button class="btn-secondary" style="font-size:0.85rem;padding:12px;" onclick="closeModal('modal-profile');openWithdraw()">Sacar</button>
-      </div>
-      <button class="btn-secondary" onclick="closeModal('modal-profile');referFriend()" style="margin-bottom:16px;width:100%;">
-        🔗 Indicar Amigo (+300 XP)
-      </button>
-      <button class="btn-secondary" onclick="confirmLogout()" style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;width:100%;">
-        🚪 Deslogar da Conta
-      </button>
-    </div>
-  </div>
 </body>
 </html>

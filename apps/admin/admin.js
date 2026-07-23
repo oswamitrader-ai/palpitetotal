@@ -357,37 +357,75 @@ async function savePlatformSettings() {
 
 // ---- DASHBOARD VIEW ----
 function renderAdminDashboardView() {
-  // Volume total = soma de todas as apostas reais (user_bets)
-  const totalVolume = adminStore.userBets.reduce((acc, ub) => acc + Number(ub.amount || 0), 0);
+  // Volume apostado = soma de BET_PLACED (valores negativos, pegamos o absoluto)
+  const totalVolume = adminStore.transactions
+    .filter(t => t.type === 'BET_PLACED')
+    .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
 
-  // Prêmios pagos = apostas ganhas (potential_win)
-  const totalPayouts = adminStore.userBets
-    .filter(ub => ub.status === 'WON')
-    .reduce((acc, ub) => acc + Number(ub.potential_win || 0), 0);
+  // Prêmios pagos = apostas ganhas (BET_WON)
+  const totalPayouts = adminStore.transactions
+    .filter(t => t.type === 'BET_WON')
+    .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-  // GGR = apostas totais apostadas - prêmios efetivamente pagos
-  const houseGGR = Math.max(0, totalVolume - totalPayouts);
+  // Liquidez injetada pela casa = LIQUIDITY_ADD
+  const totalLiquidity = adminStore.transactions
+    .filter(t => t.type === 'LIQUIDITY_ADD')
+    .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+
+  // GGR (Gross Gaming Revenue) = apostas - prêmios pagos
+  const houseGGR = totalVolume - totalPayouts;
 
   // Depósitos reais feitos pelos usuários
   const totalDeposits = adminStore.transactions
     .filter(t => t.type === 'DEPOSIT')
     .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-  // Saques aprovados
+  // Saques (aprovados ou pendentes)
   const totalWithdrawals = adminStore.transactions
-    .filter(t => t.type === 'WITHDRAWAL_APPROVED')
+    .filter(t => t.type === 'WITHDRAWAL' || t.type === 'WITHDRAWAL_APPROVED')
     .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
 
+  // Pool total ativo nas apostas
+  const totalPool = adminStore.bets.reduce((acc, b) => acc + Number(b.total_pool || 0), 0);
+
+  // Apostas ativas vs resolvidas
+  const activeBets = adminStore.bets.filter(b => b.status === 'OPEN').length;
+  const resolvedBets = adminStore.bets.filter(b => b.status && b.status.startsWith('RESOLVED')).length;
+
   const totalUsers = adminStore.profiles.length;
+  const totalTx = adminStore.transactions.length;
 
   document.getElementById('adm-volume').textContent = formatMoney(totalVolume);
   document.getElementById('adm-ggr').textContent = formatMoney(houseGGR);
   document.getElementById('adm-payouts').textContent = formatMoney(totalPayouts);
   document.getElementById('adm-users-count').textContent = totalUsers;
 
-  // Atualiza subtítulos com dados extras se existirem os elementos
   const depEl = document.getElementById('adm-deposits-sub');
-  if (depEl) depEl.textContent = `Depósitos: ${formatMoney(totalDeposits)} | Saques pagos: ${formatMoney(totalWithdrawals)}`;
+  if (depEl) depEl.textContent = `Depósitos: ${formatMoney(totalDeposits)} | Saques: ${formatMoney(totalWithdrawals)} | Liquidez: ${formatMoney(totalLiquidity)}`;
+
+  const extraPanel = document.getElementById('adm-extra-metrics');
+  if (extraPanel) {
+    extraPanel.innerHTML = `
+      <div class="adm-metric-row">
+        <div class="adm-metric-box">
+          <div class="adm-metric-label">Pool Total Ativo</div>
+          <div class="adm-metric-value" style="color:#60A5FA;">${formatMoney(totalPool)}</div>
+        </div>
+        <div class="adm-metric-box">
+          <div class="adm-metric-label">Liquidez Injetada</div>
+          <div class="adm-metric-value" style="color:#C084FC;">${formatMoney(totalLiquidity)}</div>
+        </div>
+        <div class="adm-metric-box">
+          <div class="adm-metric-label">Apostas Ativas / Resolvidas</div>
+          <div class="adm-metric-value" style="color:#34D399;">${activeBets} / ${resolvedBets}</div>
+        </div>
+        <div class="adm-metric-box">
+          <div class="adm-metric-label">Total de Transações</div>
+          <div class="adm-metric-value" style="color:#FBBF24;">${totalTx}</div>
+        </div>
+      </div>
+    `;
+  }
 
   renderAdminCharts(totalVolume, totalPayouts, houseGGR);
 }
@@ -396,11 +434,11 @@ function renderAdminCharts(totalVolume, totalPayouts, houseGGR) {
   if (typeof Chart === 'undefined') return;
 
   // Chart 1: Doughnut / Pie
-  const catCounts = { 'Tempo': 0, 'Política': 0, 'Esportes': 0, 'Dia-a-dia': 0, 'Entretenimento': 0 };
+  const catCounts = {};
   adminStore.bets.forEach(b => {
-    if (catCounts[b.category] !== undefined) {
-      catCounts[b.category] += Number(b.total_pool || 0);
-    }
+    const cat = b.category || 'Outros';
+    if (!catCounts[cat]) catCounts[cat] = 0;
+    catCounts[cat] += Number(b.total_pool || 0);
   });
 
   const pieCanvas = document.getElementById('admCategoryChart');

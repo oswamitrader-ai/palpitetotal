@@ -1593,27 +1593,39 @@ function renderMyBets() {
               <span class="user-bet-title">${ub.betTitle}</span>
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
-            <div class="user-bet-details">
-              <div class="detail-col">
+            <div class="user-bet-details" style="flex-wrap:wrap;gap:8px;">
+              <div class="detail-col" style="flex:1 1 45%;min-width:0;">
                 <div class="detail-label">Opção Escolhida</div>
                 <div class="detail-value">${ub.chosenOptionText}</div>
                 ${isPending && shares > 0 ? `<div style="font-size:0.7rem;color:var(--text-gray);margin-top:2px;">${shares.toFixed(2).replace('.', ',')} cotas</div>` : ''}
               </div>
-              <div class="detail-col">
+              <div class="detail-col" style="flex:1 1 45%;min-width:0;">
                 <div class="detail-label">Apostado</div>
                 <div class="detail-value">${formatMoney(ub.amount)}</div>
               </div>
-              <div class="detail-col">
-                <div class="detail-label">${isPending ? 'Cashout Atual' : 'Retorno'}</div>
-                <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : (isPending ? 'var(--gold-accent)' : 'var(--text-white)')}">
-                   ${formatMoney(finalReturn)}
+              ${isPending ? `
+              <div class="detail-col" style="flex:1 1 45%;min-width:0;">
+                <div class="detail-label" style="color:var(--neon-emerald);">🏆 Ganho se Vencer</div>
+                <div class="detail-value" style="color:var(--neon-emerald);font-weight:800;font-size:1rem;">
+                   ${formatMoney(shares)}
                 </div>
-                ${isPending && shares > 0 ? `
-                  <div style="font-size:0.7rem;color:${plColor};margin-top:2px;font-weight:600;">
-                     ${plSign}${formatMoney(profitLoss)}
-                  </div>` : ''
-                }
+                <div style="font-size:0.65rem;color:var(--text-gray);margin-top:2px;">= ${shares.toFixed(2).replace('.', ',')} cotas × R$ 1,00</div>
               </div>
+              <div class="detail-col" style="flex:1 1 45%;min-width:0;">
+                <div class="detail-label" style="color:var(--gold-accent);">💰 Cashout Atual</div>
+                <div class="detail-value" style="color:var(--gold-accent);font-weight:800;font-size:1rem;">
+                   ${formatMoney(cashoutValue)}
+                </div>
+                <div style="font-size:0.65rem;color:${plColor};margin-top:2px;font-weight:600;">
+                   ${plSign}${formatMoney(profitLoss)} vs apostado
+                </div>
+              </div>` : `
+              <div class="detail-col" style="flex:1 1 45%;min-width:0;">
+                <div class="detail-label">Retorno</div>
+                <div class="detail-value" style="color:${ub.status === 'WON' ? 'var(--neon-emerald)' : 'var(--text-white)'}">
+                   ${formatMoney(ub.potentialWin)}
+                </div>
+              </div>`}
             </div>
             ${isPending ? `
             <div style="font-size:0.75rem; color:var(--text-gray); margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
@@ -1702,7 +1714,7 @@ function renderWallet() {
     const pendingTag = tx.status === 'PENDING' ? '<span style="color:var(--gold-accent);font-size:0.65rem;font-weight:bold;margin-left:6px;background:rgba(245,158,11,0.2);padding:2px 6px;border-radius:4px;">PENDENTE</span>' : '';
     
     return `
-      <div class="tx-card">
+      <div class="tx-card" onclick="openTxDetails(${tx.id})" style="cursor:pointer;">
         <div class="tx-left">
           <div class="tx-icon ${iconClass}">${iconSvg}</div>
           <div>
@@ -2045,14 +2057,6 @@ function openProfile() {
   document.getElementById('level-label').textContent = `Nível ${p.level}`;
   document.getElementById('xp-bar-fill').style.width = (p.xp / threshold * 100) + '%';
 
-  // Interests
-  const allInterests = ['Tempo', 'Política', 'Dia-a-dia', 'Esportes', 'Entretenimento'];
-  const selected = p.interests.split(',').map(i => i.trim());
-  const grid = document.getElementById('interests-grid');
-  grid.innerHTML = allInterests.map(i =>
-    `<button class="interest-chip${selected.includes(i) ? ' selected' : ''}" onclick="toggleInterest('${i}')">${i}</button>`
-  ).join('');
-
   openModal('modal-profile');
 }
 
@@ -2377,7 +2381,7 @@ async function confirmLogout() {
   saveStore(store);
 
   setAppVisibility(false);
-  closeModal('modal-profile');
+  closeSheet('sheet-profile');
   showSnackbar('Sessão encerrada com sucesso!');
   openAuthModal('login');
   setTimeout(() => {
@@ -2598,4 +2602,74 @@ function openPlaceBetById(betId, optionLabel) {
   if (bet) {
     openPlaceBet(bet, optionLabel);
   }
+}
+
+
+function openTxDetails(txId) {
+  const tx = store.transactions.find(t => Number(t.id) === Number(txId));
+  if (!tx) return;
+  
+  let iconClass = 'bet';
+  let iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>';
+  let typeText = 'Operação (Palpite)';
+
+  if (tx.type === 'DEPOSIT') {
+    iconClass = 'deposit';
+    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8m-4-4h8"/></svg>';
+    typeText = 'Depósito / Bônus';
+  } else if (tx.type === 'WITHDRAWAL') {
+    iconClass = 'withdrawal';
+    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>';
+    typeText = 'Saque';
+  } else if (tx.type === 'BET_WON') {
+    iconClass = 'won';
+    iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 22V2h4v20"/></svg>';
+    typeText = 'Prêmio Ganho';
+  }
+  
+  const sign = tx.amount >= 0 ? '+' : '';
+  const amtClass = tx.amount >= 0 ? 'positive' : 'negative';
+  
+  let bgStyle = 'background: rgba(255,255,255,0.05); color: var(--text-gray);';
+  if (iconClass === 'deposit') bgStyle = 'background: rgba(16, 185, 129, 0.1); color: var(--neon-emerald);';
+  if (iconClass === 'withdrawal') bgStyle = 'background: rgba(249, 115, 22, 0.1); color: var(--neon-orange);';
+  if (iconClass === 'won') bgStyle = 'background: rgba(245, 158, 11, 0.1); color: var(--gold-accent);';
+  if (iconClass === 'bet') bgStyle = 'background: rgba(96, 165, 250, 0.1); color: var(--neon-blue);';
+
+  document.getElementById('tx-detail-icon').innerHTML = iconSvg;
+  document.getElementById('tx-detail-icon').setAttribute('style', `width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; ${bgStyle}`);
+  
+  document.getElementById('tx-detail-amount').textContent = `${sign} ${formatMoney(Math.abs(tx.amount))}`;
+  document.getElementById('tx-detail-amount').className = `tx-amount ${amtClass}`;
+  
+  if (tx.status === 'PENDING') {
+    document.getElementById('tx-detail-status').innerHTML = '<span style="color:var(--gold-accent);font-size:0.75rem;font-weight:bold;background:rgba(245,158,11,0.2);padding:4px 10px;border-radius:6px;">Processando (Pendente)</span>';
+  } else {
+    document.getElementById('tx-detail-status').innerHTML = '<span style="color:var(--neon-emerald);font-size:0.75rem;font-weight:bold;background:rgba(16,185,129,0.2);padding:4px 10px;border-radius:6px;">Concluída com Sucesso</span>';
+  }
+  
+  document.getElementById('tx-detail-desc').textContent = tx.description;
+  document.getElementById('tx-detail-date').textContent = formatDate(tx.timestamp);
+  document.getElementById('tx-detail-type').textContent = typeText;
+  
+  const optionRow = document.getElementById('tx-detail-option-row');
+  if (optionRow) {
+    optionRow.style.display = 'none';
+    // Extract option from description like "Aposta em: Title (Option)" or "Prêmio ganho: Title"
+    const descMatch = tx.description.match(/\(([^)]+)\)$/);
+    if (descMatch) {
+      document.getElementById('tx-detail-option').textContent = descMatch[1];
+      optionRow.style.display = 'flex';
+    } else if (tx.type === 'BET_PLACED' || tx.type === 'BET_WON' || tx.type === 'BET') {
+      // Fallback: find related userBet by timestamp proximity
+      const relatedBet = store.userBets.find(ub => Math.abs(ub.createdAt - tx.timestamp) < 10000);
+      if (relatedBet) {
+        document.getElementById('tx-detail-option').textContent = relatedBet.chosenOptionText;
+        optionRow.style.display = 'flex';
+      }
+    }
+  }
+  document.getElementById('tx-detail-id').textContent = `#${tx.id.toString().padStart(6, '0')}`;
+  
+  openModal('modal-tx-details');
 }

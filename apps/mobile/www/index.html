@@ -345,43 +345,8 @@
   </div>
 
   <!-- Profile Modal -->
-  <div class="modal-overlay" id="modal-profile">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-title">Meu Perfil</span>
-        <button class="modal-close" onclick="closeModal('modal-profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
-      <div class="profile-header">
-        <div class="profile-avatar-large" id="profile-avatar-large">P</div>
-        <div class="profile-username" id="profile-username"></div>
-        <div class="profile-frame" id="profile-frame">Moldura Bronze</div>
-      </div>
-      <div class="xp-bar-container">
-        <div class="xp-bar-label">
-          <span id="xp-label">XP: 0 / 200</span>
-          <span id="level-label">Nível 1</span>
-        </div>
-        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
-      </div>
-      <div style="margin-bottom:16px;">
-        <div class="form-label">Áreas de Interesse</div>
-        <div class="interests-grid" id="interests-grid"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <button class="btn-primary" style="font-size:0.75rem;" onclick="closeModal('modal-profile');openDeposit()">Depositar</button>
-        <button class="btn-secondary" style="font-size:0.75rem;" onclick="closeModal('modal-profile');openWithdraw()">Sacar</button>
-      </div>
-      <button class="btn-secondary" onclick="referFriend()" style="margin-top:6px;">
-        🔗 Indicar Amigo (+300 XP)
-      </button>
-      <button class="btn-secondary" onclick="confirmLogout()" style="margin-top:10px;background:rgba(239,68,68,0.15);color:#EF4444;border-color:rgba(239,68,68,0.3);">
-        🚪 Sair da Conta (Logout)
-      </button>
-    </div>
-  </div>
-
-  <!-- Notifications Modal -->
-  <div class="modal-overlay" id="modal-notifications">
+    
+<div class="modal-overlay" id="modal-notifications">
     <div class="modal-card">
       <div class="modal-header">
         <span class="modal-title">🔔 Notificações</span>
@@ -466,6 +431,88 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=47"></script>
+
+  <!-- TX Details Bottom Sheet -->
+  <div class="modal-overlay" id="modal-tx-details">
+    <div class="bottom-sheet">
+      <div class="bottom-sheet-drag"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:1.25rem;font-weight:700;color:var(--text-white);">Detalhes da Transação</h2>
+        <button class="modal-close" onclick="closeModal('modal-tx-details')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      
+      <div style="text-align:center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px;">
+        <div id="tx-detail-icon" style="width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;"></div>
+        <div id="tx-detail-amount" style="font-size: 2rem; font-weight: 800;">R$ 0,00</div>
+        <div id="tx-detail-status" style="margin-top: 8px;"></div>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-gray); font-size: 0.85rem;">Descrição</span>
+          <span id="tx-detail-desc" style="color: var(--text-white); font-weight: 600; font-size: 0.9rem; text-align: right; max-width: 60%;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-gray); font-size: 0.85rem;">Data e Hora</span>
+          <span id="tx-detail-date" style="color: var(--text-white); font-weight: 600; font-size: 0.9rem;"></span>
+        </div>
+        <div id="tx-detail-option-row" style="display: none; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-gray); font-size: 0.85rem;">Opção Escolhida</span>
+          <span id="tx-detail-option" style="color: var(--gold-accent); font-weight: 700; font-size: 0.9rem; text-align: right; max-width: 60%;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-gray); font-size: 0.85rem;">Tipo</span>
+          <span id="tx-detail-type" style="color: var(--text-white); font-weight: 600; font-size: 0.9rem;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-gray); font-size: 0.85rem;">ID da Transação</span>
+          <span id="tx-detail-id" style="color: var(--text-white); font-weight: 600; font-size: 0.9rem; font-family: monospace;"></span>
+        </div>
+      </div>
+      
+      <button class="btn-primary" style="width:100%;" onclick="closeModal('modal-tx-details')">Fechar</button>
+    </div>
+  </div>
+
+
+  <!-- Profile Bottom Sheet -->
+  <div class="modal-overlay" id="modal-profile">
+    <div class="bottom-sheet">
+      <div class="bottom-sheet-drag"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <span class="bottom-sheet-title" style="font-size:1.25rem;font-weight:700;color:var(--text-white);">Meu Perfil</span>
+        <button class="modal-close" onclick="closeModal('modal-profile')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      
+      <div class="profile-header" style="margin-bottom:20px;">
+        <div class="profile-avatar-large" id="profile-avatar-large">P</div>
+        <div class="profile-username" id="profile-username" style="margin-top:8px;"></div>
+        <div class="profile-frame" id="profile-frame">Moldura Bronze</div>
+      </div>
+      <div class="xp-bar-container" style="margin-bottom:20px;">
+        <div class="xp-bar-label">
+          <span id="xp-label">XP: 0 / 200</span>
+          <span id="level-label">Nível 1</span>
+        </div>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <button class="btn-primary" style="font-size:0.85rem;padding:12px;" onclick="closeModal('modal-profile');openDeposit()">Depositar</button>
+        <button class="btn-secondary" style="font-size:0.85rem;padding:12px;" onclick="closeModal('modal-profile');openWithdraw()">Sacar</button>
+      </div>
+      <button class="btn-secondary" onclick="closeModal('modal-profile');referFriend()" style="margin-bottom:16px;width:100%;">
+        🔗 Indicar Amigo (+300 XP)
+      </button>
+      <button class="btn-secondary" onclick="confirmLogout()" style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;width:100%;">
+        🚪 Deslogar da Conta
+      </button>
+    </div>
+  </div>
 </body>
 </html>
