@@ -422,12 +422,88 @@
       </div>
     </div>
   </div>
+<div class="modal-overlay" id="modal-notifications">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">🔔 Notificações</span>
+        <button class="modal-close" onclick="closeModal('modal-notifications')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div id="notif-list"></div>
+      <div class="notif-actions" style="margin-top:16px;">
+        <button class="btn-secondary" style="width:100%;font-size:0.8rem;" onclick="clearNotifications()">Marcar tudo como lido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal (Login & Cadastro) -->
+  <div class="modal-overlay" id="modal-auth">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title" id="auth-modal-title">Acessar PalpiteTotal</span>
+        <!-- Botão de fechar removido para obrigar o Login -->
+      </div>
+
+      <!-- Auth Mode Switcher -->
+      <div class="manage-toggle" style="margin-bottom:16px;">
+        <button class="manage-toggle-btn active" id="auth-tab-login" onclick="switchAuthTab('login')">Entrar</button>
+        <button class="manage-toggle-btn" id="auth-tab-register" onclick="switchAuthTab('register')">Criar Conta</button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="auth-form-login">
+        <div class="form-group">
+          <label class="form-label">E-mail ou Usuário</label>
+          <input type="text" class="form-input" id="login-email" placeholder="seuemail@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha de Acesso</label>
+          <input type="password" class="form-input" id="login-password" placeholder="••••••••">
+        </div>
+        <div class="form-error" id="login-error" style="display:none"></div>
+        <button class="btn-primary" onclick="confirmLogin()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Entrar na Conta
+        </button>
+      </div>
+
+      <!-- Register Form -->
+      <div id="auth-form-register" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Nome Completo / Apelido</label>
+          <input type="text" class="form-input" id="reg-username" placeholder="Ex: PalpiteiroPro">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Endereço de E-mail</label>
+          <input type="email" class="form-input" id="reg-email" placeholder="seuemail@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha de Acesso</label>
+          <input type="password" class="form-input" id="reg-password" placeholder="Crie uma senha forte">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Interesses Iniciais</label>
+          <div class="interests-grid" id="reg-interests">
+            <button type="button" class="interest-chip selected" onclick="this.classList.toggle('selected')">Tempo</button>
+            <button type="button" class="interest-chip selected" onclick="this.classList.toggle('selected')">Esportes</button>
+            <button type="button" class="interest-chip selected" onclick="this.classList.toggle('selected')">Política</button>
+            <button type="button" class="interest-chip" onclick="this.classList.toggle('selected')">Dia-a-dia</button>
+            <button type="button" class="interest-chip selected" onclick="this.classList.toggle('selected')">Entretenimento</button>
+          </div>
+        </div>
+        <div class="form-error" id="reg-error" style="display:none"></div>
+        <button class="btn-primary" onclick="confirmRegister()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+          Cadastrar e Ganhar R$1.000 Bônus (+150 XP)
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Snackbar -->
   <div class="snackbar" id="snackbar"></div>
 
   <!-- Supabase JS SDK, PeerJS & Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>

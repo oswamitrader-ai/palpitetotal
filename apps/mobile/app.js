@@ -91,8 +91,8 @@ async function syncFromSupabase() {
       supabaseClient.from('transactions').select('*').eq('username', store.profile.username).order('id', { ascending: true }),
       supabaseClient.from('posts').select('*').order('id', { ascending: false }),
       isLoggedIn && store.profile.username ? supabaseClient.from('profiles').select('*').eq('username', store.profile.username) : Promise.resolve({ data: null }),
-      supabaseClient.from('post_likes').select('*').catch(() => ({ data: [] })),
-      supabaseClient.from('post_comments').select('*').order('created_at', { ascending: true }).catch(() => ({ data: [] }))
+      supabaseClient.from('post_likes').select('*'),
+      supabaseClient.from('post_comments').select('*').order('created_at', { ascending: true })
     ]);
 
     const stData = settingsRes.data;
@@ -136,6 +136,9 @@ async function syncFromSupabase() {
         expiresAt: b.expires_at ? new Date(b.expires_at).getTime() : null
       };
     });
+  } else {
+    store.bets = [];
+    seedInitialData();
   }
 
     const dbUserBets = userBetsRes.data;
@@ -254,6 +257,7 @@ const dbPosts = postsRes.data;
     renderCurrentTab();
   } catch (err) {
     console.warn('Usando dados do cache local:', err);
+    showSnackbar('SYNC ERROR: ' + (err.message || JSON.stringify(err)));
   }
 }
 
@@ -491,6 +495,12 @@ function setAppVisibility(visible) {
 }
 
 async function initApp() {
+  if (isLoggedIn && (!loggedInUser || !store.profile.username)) {
+    console.warn("Ghost user detected, forcing logout.");
+    confirmLogout();
+    return;
+  }
+
   if (loggedInUser) {
     const avatarLetter = document.getElementById('avatar-letter');
     if (avatarLetter) avatarLetter.textContent = loggedInUser.charAt(0).toUpperCase();
@@ -1263,7 +1273,13 @@ function handleBetClick(betId, option) {
   if (quickBetEnabled) {
     const bal = getBalance();
     if (bal >= quickBetAmount) {
-      executePlaceBet(bet, option, quickBetAmount);
+      const betOpt = bet.options ? bet.options.find(o => o.option_label === option) : null;
+      const poolOpt = betOpt ? parseFloat(betOpt.pool) || 0 : 0;
+      const poolTot = parseFloat(bet.totalPool) || 0;
+      const prob = (poolOpt > 0 && poolTot > 0) ? (poolOpt / poolTot) : (1 / (bet.options ? bet.options.length : 2));
+      const shares = quickBetAmount / prob;
+
+      executePlaceBet(bet, option, quickBetAmount, prob, shares);
       showSnackbar(`Aposta Rápida: R$ ${quickBetAmount.toFixed(2)} na Opção ${option}!`);
     } else {
       showSnackbar('Saldo insuficiente para Aposta Rápida!');
@@ -2478,7 +2494,7 @@ async function confirmLogout() {
   saveStore(store);
 
   setAppVisibility(false);
-  closeSheet('sheet-profile');
+  closeModal('modal-profile');
   showSnackbar('Sessão encerrada com sucesso!');
   openAuthModal('login');
   setTimeout(() => {

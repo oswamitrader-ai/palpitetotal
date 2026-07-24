@@ -233,6 +233,8 @@ function switchAdminTab(tab) {
 
   if (tab === 'studio') {
     initAdminStudio();
+  } else if (tab === 'posts') {
+    loadAdminPosts();
   } else {
     renderAdminCurrentTab();
   }
@@ -2455,3 +2457,82 @@ function showSnackbar(msg) {
   if (snackTimeout) clearTimeout(snackTimeout);
   snackTimeout = setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+// ---- GESTÃO DE POSTAGENS (SOCIAL) ----
+let adminPosts = [];
+
+async function loadAdminPosts() {
+  if (!supabaseClient) return;
+  const table = document.getElementById('adm-posts-table');
+  table.innerHTML = '<div style="color:var(--text-gray);text-align:center;padding:20px;">Carregando postagens...</div>';
+  
+  try {
+    const { data, error } = await supabaseClient.from('posts').select('*').order('timestamp', { ascending: false });
+    if (error) throw error;
+    
+    adminPosts = data || [];
+    renderAdminPosts();
+  } catch (err) {
+    console.error(err);
+    table.innerHTML = '<div style="color:#EF4444;text-align:center;padding:20px;">Erro ao carregar postagens.</div>';
+  }
+}
+
+function renderAdminPosts() {
+  const container = document.getElementById('adm-posts-table');
+  if (!container) return;
+
+  if (adminPosts.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-gray);text-align:center;padding:20px;background:rgba(255,255,255,0.02);border-radius:12px;">Nenhuma postagem encontrada na plataforma.</div>';
+    return;
+  }
+
+  let html = `<div class="adm-table-container"><table class="adm-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Data</th>
+        <th>Usuário</th>
+        <th>Postagem / Comentário</th>
+        <th>Aposta Relacionada</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  adminPosts.forEach(p => {
+    html += `
+      <tr>
+        <td style="color:var(--text-gray); font-size:0.75rem;">#${p.id}</td>
+        <td style="font-size:0.75rem;">${formatDate(p.created_at || p.timestamp)}</td>
+        <td style="font-weight:600; color:var(--text-white);">@${p.username}</td>
+        <td style="max-width:300px; white-space:normal; font-size:0.8rem; color:var(--text-gray);">${p.comment || ''}</td>
+        <td style="font-size:0.75rem; color:var(--gold-accent); max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          ${p.bet_title ? `[${p.chosen_option}] ${p.bet_title}` : 'Sem Aposta'}
+        </td>
+        <td>
+          <button class="btn-secondary" style="padding:4px 8px; font-size:0.7rem; background:rgba(239,68,68,0.1); color:#EF4444; border:1px solid rgba(239,68,68,0.3); width:auto;" onclick="deleteAdminPost(${p.id})">🗑️ Excluir</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+async function deleteAdminPost(id) {
+  if (!confirm('Tem certeza que deseja EXCLUIR DEFINITIVAMENTE esta postagem do Feed Social?')) return;
+  
+  try {
+    const { error } = await supabaseClient.from('posts').delete().eq('id', id);
+    if (error) throw error;
+    
+    showSnackbar('Postagem excluída com sucesso!');
+    loadAdminPosts();
+  } catch (err) {
+    console.error(err);
+    showSnackbar('Erro ao excluir postagem.');
+  }
+}
+
