@@ -695,9 +695,9 @@ button, a, [role="button"] {
 }
 
 .bet-odds-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .market-bar-container {
@@ -719,19 +719,19 @@ button, a, [role="button"] {
 .odds-btn {
   background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: 14px 10px;
+  border-radius: 8px;
+  padding: 8px 12px;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
+  justify-content: space-between;
   align-items: center;
   gap: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
-  min-height: var(--touch-min);
+  min-height: 40px;
 }
 
 .odds-btn:hover {
@@ -778,22 +778,20 @@ button, a, [role="button"] {
 .odds-label {
   font-size: 0.75rem;
   color: var(--text-white);
-  font-weight: 700;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
   text-align: left;
-  margin-right: 6px;
 }
 
 .odds-value {
-  font-size: 1.35rem;
-  font-weight: 900;
+  font-size: 0.95rem;
+  font-weight: 800;
   color: var(--gold-accent);
   font-family: var(--font-mono);
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
-  letter-spacing: -0.5px;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
   flex-shrink: 0;
 }
 

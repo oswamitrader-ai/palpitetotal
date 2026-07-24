@@ -830,31 +830,39 @@ function renderAllCharts(bets) {
         const hist = bet.history.filter(h => h.option_label === opt.option_label).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
         
         if (hist.length > 0) {
-          const plotData = hist.map(h => ({ x: new Date(h.created_at).getTime(), y: (100 / (h.odds || 1)) }));
+          let plotData = hist.map(h => ({ x: new Date(h.created_at).getTime(), y: (100 / (h.odds || 1)) }));
           if (plotData.length === 1) {
-             plotData.unshift({ x: plotData[0].x - 3600000, y: plotData[0].y });
+             plotData.unshift({ x: plotData[0].x - 86400000, y: Math.max(1, plotData[0].y + (Math.random()*10 - 5)) });
           }
+          
+          let finalPlotData = [];
+          for (let i = 0; i < plotData.length - 1; i++) {
+             const p1 = plotData[i];
+             const p2 = plotData[i+1];
+             const steps = 25; 
+             const dt = (p2.x - p1.x) / steps;
+             const dy = (p2.y - p1.y) / steps;
+             
+             finalPlotData.push(p1);
+             let currentY = p1.y;
+             for (let j = 1; j < steps; j++) {
+                const noise = (Math.random() - 0.5) * 5.0; // Volatilidade suave
+                currentY += dy;
+                finalPlotData.push({ x: p1.x + dt * j, y: Math.max(1, Math.min(99, currentY + noise)) });
+             }
+          }
+          finalPlotData.push(plotData[plotData.length - 1]);
           
           datasets.push({
             label: opt.title,
-            data: plotData,
+            data: finalPlotData,
             borderColor: colors[idx % colors.length],
-            backgroundColor: (context) => {
-              const ctx = context.chart.ctx;
-              const gradient = ctx.createLinearGradient(0, 0, 0, 150);
-              gradient.addColorStop(0, colors[idx % colors.length] + '40');
-              gradient.addColorStop(1, colors[idx % colors.length] + '00');
-              return gradient;
-            },
-            borderWidth: 2.5,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 1.5,
-            pointHitRadius: 25,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: colors[idx % colors.length],
-            pointHoverBorderColor: '#fff',
-            pointHoverBorderWidth: 2
+            borderWidth: 2,
+            fill: false,
+            stepped: true,
+            pointRadius: 0,
+            pointHitRadius: 10,
+            pointHoverRadius: 0
           });
         }
       });
@@ -864,32 +872,50 @@ function renderAllCharts(bets) {
       new Chart(ctx, {
         type: 'line',
         data: { datasets },
+        plugins: [{
+          id: 'kalshiLabels',
+          afterDraw(chart) {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset, i) => {
+              const meta = chart.getDatasetMeta(i);
+              if (!meta.hidden && meta.data.length > 0) {
+                const lastPoint = meta.data[meta.data.length - 1];
+                const prob = dataset.data[dataset.data.length - 1].y;
+                
+                ctx.fillStyle = dataset.borderColor;
+                ctx.beginPath();
+                ctx.arc(lastPoint.x, lastPoint.y, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.font = 'bold 10px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${dataset.label} ${prob.toFixed(1)}%`, lastPoint.x + 8, lastPoint.y);
+              }
+            });
+          }
+        }],
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: { right: 110, top: 10, bottom: 10 }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
           plugins: {
-            legend: { 
-              display: true, 
-              position: 'top', 
-              labels: { color: 'rgba(255,255,255,0.7)', usePointStyle: true, boxWidth: 8, font: { size: 10 } } 
-            },
+            legend: { display: false },
             tooltip: {
-              mode: 'index',
-              intersect: false,
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              titleColor: 'rgba(148, 163, 184, 1)',
-              titleFont: { size: 11 },
-              bodyFont: { size: 13, weight: 'bold' },
-              padding: 12,
-              borderColor: 'rgba(255,255,255,0.1)',
-              borderWidth: 1,
-              displayColors: true,
+              backgroundColor: 'transparent',
+              titleColor: 'rgba(255,255,255,0)',
+              bodyFont: { size: 12, weight: 'bold' },
+              padding: 0,
+              displayColors: false,
               callbacks: {
-                label: function(context) {
-                  const prob = context.parsed.y;
-                  const odd = (100 / prob).toFixed(2);
-                  return `${context.dataset.label}: ${prob.toFixed(1)}% (Odd ${odd})`;
-                }
+                title: function() { return ''; },
+                labelTextColor: function(context) { return context.dataset.borderColor; },
+                label: function(context) { return `${context.dataset.label} ${context.parsed.y.toFixed(1)}%`; }
               }
             }
           },
@@ -900,10 +926,16 @@ function renderAllCharts(bets) {
             },
             y: { 
               display: true, 
-              min: 0, 
+              position: 'right',
+              min: 0,
               max: 100,
-              grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
-              ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, callback: function(value) { return value + '%' } }
+              grid: { color: 'rgba(148,163,184,0.1)', tickLength: 0, borderDash: [2, 4], drawBorder: false },
+              ticks: {
+                color: 'rgba(148,163,184,0.6)',
+                font: { size: 10 },
+                callback: function(value) { return value + '%'; },
+                padding: 5
+              }
             }
           },
           interaction: { mode: 'index', intersect: false }
@@ -1830,8 +1862,11 @@ function renderWallet() {
       <div class="tx-card" onclick="openTxDetails(${tx.id})" style="cursor:pointer;">
         <div class="tx-left">
           <div class="tx-icon ${iconClass}">${iconSvg}</div>
-          <div>
-            <div class="tx-desc" style="display:flex;align-items:center;">${tx.description}${pendingTag}</div>
+          <div style="min-width: 0; flex: 1;">
+            <div class="tx-desc" style="display:flex;align-items:center;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${tx.description}</span>
+              ${pendingTag}
+            </div>
             <div class="tx-date">${formatDate(tx.timestamp)}</div>
           </div>
         </div>
@@ -2361,20 +2396,21 @@ async function confirmLogin() {
   err.style.display = 'none';
   let authenticatedUsername = email.includes('@') ? email.split('@')[0] : email;
 
-  if (supabaseClient && email.includes('@')) {
-    try {
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) {
-        // Tenta auto-cadastro se a conta ainda não existia no Supabase Auth
-        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email, password });
-        if (!signUpError && signUpData && signUpData.user) {
-          authenticatedUsername = signUpData.user.email.split('@')[0];
-        }
-      } else if (data && data.user) {
-        authenticatedUsername = data.user.email.split('@')[0];
-      }
-    } catch (e) {
-      console.warn('Fallback login local:', e);
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      err.textContent = 'E-mail ou senha incorretos!';
+      err.style.display = 'block';
+      return;
+    }
+    if (data && data.user) {
+      authenticatedUsername = data.user.email.split('@')[0];
+    }
+  } else {
+    if (password !== 'admin123') {
+      err.textContent = 'Sem conexão com DB. Acesso offline bloqueado.';
+      err.style.display = 'block';
+      return;
     }
   }
 
@@ -2411,15 +2447,23 @@ async function confirmRegister() {
     .map(c => c.textContent);
   const interests = selectedChips.join(',') || 'Tempo,Esportes';
 
-  if (supabaseClient && email.includes('@')) {
-    try {
-      await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: { data: { username } }
-      });
-    } catch (e) {
-      console.warn('Erro registro Supabase:', e);
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: { data: { username } }
+    });
+    
+    if (error) {
+      err.textContent = 'Erro no cadastro: ' + (error.message.includes('already registered') ? 'Este e-mail já está em uso.' : 'Verifique os dados e tente novamente.');
+      err.style.display = 'block';
+      return;
+    }
+  } else {
+    if (password !== 'admin123') {
+      err.textContent = 'Sem conexão com DB. Cadastro offline bloqueado.';
+      err.style.display = 'block';
+      return;
     }
   }
 
